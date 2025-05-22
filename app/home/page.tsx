@@ -162,6 +162,12 @@ export default function HomePage() {
     router.push("/wallet/charge")
   }
 
+  // Handle transfer button click
+  const handleTransfer = () => {
+    // Navigate to transfer page
+    router.push("/wallet/transfer")
+  }
+
   // Handle refund button click
   const handleRefund = () => {
     // Navigate to refund page
@@ -209,8 +215,10 @@ export default function HomePage() {
           {hasWallet && walletBalances.length > 0 ? (
             <div className="mt-4 space-y-3">
               {walletBalances.map((balance, index) => {
-                // Find account for this currency
-                const account = accounts.find((acc) => acc.currency === balance.code)
+                // 각 통화별로 고정된 지갑 번호 생성 (통화 코드 기반)
+                const walletNumber = `9791-${balance.code.charCodeAt(0)}${balance.code.charCodeAt(1)}-${
+                  balance.code.length > 2 ? balance.code.charCodeAt(2) : "00"
+                }${index + 1000}-${4618 + index}`
 
                 return (
                   <div
@@ -232,7 +240,7 @@ export default function HomePage() {
                           {balance.country} {balance.code}
                         </p>
                         <p className="text-lg font-bold text-gray-800">{balance.amount.toLocaleString()}</p>
-                        {account && <p className="text-xs text-gray-400">{account.accountNumber}</p>}
+                        <p className="text-xs text-gray-400">{walletNumber}</p>
                       </div>
                     </div>
                   </div>
@@ -247,7 +255,10 @@ export default function HomePage() {
           )}
 
           <div className="mt-5 flex space-x-4">
-            <button className="group relative flex-1 overflow-hidden rounded-lg bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] py-4 text-center font-medium text-white shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)] transition-all duration-300 hover:shadow-[0_6px_10px_-1px_rgba(77,169,255,0.4),0_2px_6px_-2px_rgba(77,169,255,0.3)] active:translate-y-0.5 active:shadow-[0_2px_4px_-1px_rgba(77,169,255,0.3),0_1px_2px_-1px_rgba(77,169,255,0.2)]">
+            <button
+              onClick={handleTransfer}
+              className="group relative flex-1 overflow-hidden rounded-lg bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] py-4 text-center font-medium text-white shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)] transition-all duration-300 hover:shadow-[0_6px_10px_-1px_rgba(77,169,255,0.4),0_2px_6px_-2px_rgba(77,169,255,0.3)] active:translate-y-0.5 active:shadow-[0_2px_4px_-1px_rgba(77,169,255,0.3),0_1px_2px_-1px_rgba(77,169,255,0.2)]"
+            >
               <span className="relative z-10">송금하기</span>
               <div className="absolute inset-0 -left-full h-full w-full translate-x-0 bg-white opacity-20 transition-transform duration-300 group-hover:translate-x-full"></div>
             </button>

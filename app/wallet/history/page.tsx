@@ -296,6 +296,17 @@ export default function TransactionHistoryPage() {
     }
   }
 
+  // Handle transfer button click
+  const handleTransfer = () => {
+    // If a specific currency is selected, pass it to the transfer page
+    if (selectedCurrency !== "전체통화") {
+      router.push(`/wallet/transfer?currency=${selectedCurrency}`)
+    } else {
+      // For "전체통화" view, go to transfer page without currency
+      router.push("/wallet/transfer")
+    }
+  }
+
   // Handle refund button click
   const handleRefund = () => {
     // If a specific currency is selected, pass it to the refund page
@@ -397,20 +408,9 @@ export default function TransactionHistoryPage() {
             <div className="mt-2 text-3xl font-bold">
               {getCurrencySymbol(selectedWallet.code)} {selectedWallet.amount.toLocaleString()}
             </div>
-            {(() => {
-              // Find account for this currency
-              const accounts = JSON.parse(localStorage.getItem("bankAccounts") || "[]")
-              const account = accounts.find((acc: any) => acc.currency === selectedWallet.code)
-
-              if (account) {
-                return (
-                  <div className="mt-1 text-sm text-gray-500">
-                    {account.bankName} {account.accountNumber}
-                  </div>
-                )
-              }
-              return null
-            })()}
+            <div className="mt-1 text-sm text-gray-500">
+              지갑번호: {Math.floor(Math.random() * 900000) + 100000}-{Math.floor(Math.random() * 900000) + 100000}
+            </div>
           </>
         )}
 
@@ -426,7 +426,10 @@ export default function TransactionHistoryPage() {
             <span className="text-sm font-medium text-gray-700">충전</span>
           </div>
           <div className="flex flex-col items-center">
-            <div className="mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] shadow-md">
+            <button
+              onClick={handleTransfer}
+              className="mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] shadow-md"
+            >
               <svg
                 width="24"
                 height="24"
@@ -443,7 +446,7 @@ export default function TransactionHistoryPage() {
                   strokeLinejoin="round"
                 />
               </svg>
-            </div>
+            </button>
             <span className="text-sm font-medium text-gray-700">송금</span>
           </div>
           <div className="flex flex-col items-center">
