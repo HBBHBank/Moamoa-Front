@@ -32,6 +32,14 @@ export default function HomePage() {
   const carouselRef = useRef<HTMLDivElement>(null)
   const [isScrolling, setIsScrolling] = useState(false)
   const [activeCardIndex, setActiveCardIndex] = useState(0)
+  const [accounts, setAccounts] = useState<
+    Array<{
+      bankName: string
+      accountNumber: string
+      logoSrc: string
+      currency: string
+    }>
+  >([])
 
   useEffect(() => {
     // Check if user is logged in
@@ -45,15 +53,28 @@ export default function HomePage() {
     const hasChargedWallet = localStorage.getItem("hasChargedWallet")
     setHasWallet(hasChargedWallet === "true")
 
-    if (hasChargedWallet === "true") {
-      // Mock wallet data with actual flag images
-      setWalletBalances([
+    // Load wallet balances from localStorage
+    const storedBalances = localStorage.getItem("walletBalances")
+    if (storedBalances) {
+      const parsedBalances = JSON.parse(storedBalances)
+      setWalletBalances(parsedBalances)
+    } else if (hasChargedWallet === "true") {
+      // Fallback to default balances if none are stored
+      const defaultBalances = [
         { country: "대한민국", code: "KRW", flagSrc: "/images/flags/korea.png", amount: 10000 },
         { country: "중국", code: "CNY", flagSrc: "/images/flags/china.png", amount: 50 },
         { country: "인도", code: "INR", flagSrc: "/images/flags/india.png", amount: 800 },
         { country: "일본", code: "JPY", flagSrc: "/images/flags/japan.png", amount: 1000 },
         { country: "유럽", code: "EUR", flagSrc: "/images/flags/eu.png", amount: 10 },
-      ])
+      ]
+      setWalletBalances(defaultBalances)
+      localStorage.setItem("walletBalances", JSON.stringify(defaultBalances))
+    }
+
+    // Load bank accounts
+    const storedAccounts = localStorage.getItem("bankAccounts")
+    if (storedAccounts) {
+      setAccounts(JSON.parse(storedAccounts))
     }
 
     // Set exchange rate data
@@ -137,16 +158,8 @@ export default function HomePage() {
   }, [router, isScrolling, exchangeRates.length])
 
   const handleCharge = () => {
-    // Simulate charging the wallet
-    localStorage.setItem("hasChargedWallet", "true")
-    setHasWallet(true)
-    setWalletBalances([
-      { country: "대한민국", code: "KRW", flagSrc: "/images/flags/korea.png", amount: 10000 },
-      { country: "중국", code: "CNY", flagSrc: "/images/flags/china.png", amount: 50 },
-      { country: "인도", code: "INR", flagSrc: "/images/flags/india.png", amount: 800 },
-      { country: "일본", code: "JPY", flagSrc: "/images/flags/japan.png", amount: 1000 },
-      { country: "유럽", code: "EUR", flagSrc: "/images/flags/eu.png", amount: 10 },
-    ])
+    // Navigate to charge page
+    router.push("/wallet/charge")
   }
 
   // 지갑 항목 클릭 핸들러
@@ -187,27 +200,38 @@ export default function HomePage() {
             </Link>
           </div>
 
-          {hasWallet ? (
+          {hasWallet && walletBalances.length > 0 ? (
             <div className="mt-4 space-y-3">
-              {walletBalances.map((balance, index) => (
-                <div
-                  key={index}
-                  className="group flex cursor-pointer items-center justify-between border-b border-gray-100 pb-3 transition-all duration-300 hover:translate-x-1"
-                  onClick={() => handleWalletClick(balance.code)}
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="relative h-10 w-10 overflow-hidden rounded-full border border-gray-100 shadow-sm transition-all duration-300 group-hover:shadow-md">
-                      <Image src={balance.flagSrc || "/placeholder.svg"} alt={balance.country} width={40} height={40} />
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-gray-500">
-                        {balance.country} {balance.code}
-                      </p>
-                      <p className="text-lg font-bold text-gray-800">{balance.amount.toLocaleString()}</p>
+              {walletBalances.map((balance, index) => {
+                // Find account for this currency
+                const account = accounts.find((acc) => acc.currency === balance.code)
+
+                return (
+                  <div
+                    key={index}
+                    className="group flex cursor-pointer items-center justify-between border-b border-gray-100 pb-3 transition-all duration-300 hover:translate-x-1"
+                    onClick={() => handleWalletClick(balance.code)}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="relative h-10 w-10 overflow-hidden rounded-full border border-gray-100 shadow-sm transition-all duration-300 group-hover:shadow-md">
+                        <Image
+                          src={balance.flagSrc || "/placeholder.svg"}
+                          alt={balance.country}
+                          width={40}
+                          height={40}
+                        />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-gray-500">
+                          {balance.country} {balance.code}
+                        </p>
+                        <p className="text-lg font-bold text-gray-800">{balance.amount.toLocaleString()}</p>
+                        {account && <p className="text-xs text-gray-400">{account.accountNumber}</p>}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           ) : (
             <div className="my-10 text-center text-gray-500">
@@ -222,8 +246,8 @@ export default function HomePage() {
               <div className="absolute inset-0 -left-full h-full w-full translate-x-0 bg-white opacity-20 transition-transform duration-300 group-hover:translate-x-full"></div>
             </button>
             <button
-              className="group relative flex-1 overflow-hidden rounded-lg bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] py-4 text-center font-medium text-white shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)] transition-all duration-300 hover:shadow-[0_6px_10px_-1px_rgba(77,169,255,0.4),0_2px_6px_-2px_rgba(77,169,255,0.3)] active:translate-y-0.5 active:shadow-[0_2px_4px_-1px_rgba(77,169,255,0.3),0_1px_2px_-1px_rgba(77,169,255,0.2)]"
               onClick={handleCharge}
+              className="group relative flex-1 overflow-hidden rounded-lg bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] py-4 text-center font-medium text-white shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)] transition-all duration-300 hover:shadow-[0_6px_10px_-1px_rgba(77,169,255,0.4),0_2px_6px_-2px_rgba(77,169,255,0.3)] active:translate-y-0.5 active:shadow-[0_2px_4px_-1px_rgba(77,169,255,0.3),0_1px_2px_-1px_rgba(77,169,255,0.2)]"
             >
               <span className="relative z-10">충전하기</span>
               <div className="absolute inset-0 -left-full h-full w-full translate-x-0 bg-white opacity-20 transition-transform duration-300 group-hover:translate-x-full"></div>

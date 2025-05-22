@@ -284,6 +284,18 @@ export default function TransactionHistoryPage() {
     setShowFilterModal(!showFilterModal)
   }
 
+  // Handle charge button click
+  const handleCharge = () => {
+    // If a specific currency is selected, pass it to the charge page
+    if (selectedCurrency !== "전체통화") {
+      router.push(`/wallet/charge?currency=${selectedCurrency}`)
+    } else {
+      // For "전체통화" view, just go to charge page without currency
+      // The charge page will show currency selection
+      router.push("/wallet/charge")
+    }
+  }
+
   // Filter application logic
   const applyFilters = () => {
     // Generate fresh transactions data
@@ -369,17 +381,36 @@ export default function TransactionHistoryPage() {
 
         {/* Display balance if specific currency is selected */}
         {selectedWallet && (
-          <div className="mt-2 text-3xl font-bold">
-            {getCurrencySymbol(selectedWallet.code)} {selectedWallet.amount.toLocaleString()}
-          </div>
+          <>
+            <div className="mt-2 text-3xl font-bold">
+              {getCurrencySymbol(selectedWallet.code)} {selectedWallet.amount.toLocaleString()}
+            </div>
+            {(() => {
+              // Find account for this currency
+              const accounts = JSON.parse(localStorage.getItem("bankAccounts") || "[]")
+              const account = accounts.find((acc: any) => acc.currency === selectedWallet.code)
+
+              if (account) {
+                return (
+                  <div className="mt-1 text-sm text-gray-500">
+                    {account.bankName} {account.accountNumber}
+                  </div>
+                )
+              }
+              return null
+            })()}
+          </>
         )}
 
         {/* Action Buttons */}
         <div className="mt-8 flex w-full max-w-md justify-around px-4">
           <div className="flex flex-col items-center">
-            <div className="mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] shadow-md">
+            <button
+              onClick={handleCharge}
+              className="mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] shadow-md"
+            >
               <span className="text-2xl font-bold text-white">+</span>
-            </div>
+            </button>
             <span className="text-sm font-medium text-gray-700">충전</span>
           </div>
           <div className="flex flex-col items-center">
@@ -563,6 +594,16 @@ export default function TransactionHistoryPage() {
             <p className="mt-2 text-sm">선택한 조건에 맞는 거래 내역이 없습니다.</p>
           </div>
         )}
+      </div>
+
+      {/* Action buttons at the bottom */}
+      <div className="border-t border-gray-200 p-4">
+        <button
+          onClick={handleCharge}
+          className="w-full rounded-lg bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] py-4 text-center text-lg font-medium text-white shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)]"
+        >
+          충전하기
+        </button>
       </div>
 
       {/* Filter Modal Component */}
