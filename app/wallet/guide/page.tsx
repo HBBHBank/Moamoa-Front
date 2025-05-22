@@ -29,7 +29,7 @@ export default function WalletGuidePage() {
           <div className="rounded-lg bg-gray-50 p-4">
             <h2 className="mb-2 font-medium">송금하기</h2>
             <p className="text-sm text-gray-700">
-              충전한 금액이 ₩50 이상인 경우 송금할 수 있습니다. 모아모아 회원끼리만 지갑끼리의 송금이 가능합니다.
+              모아모아 회원끼리만 지갑끼리의 송금이 가능합니다.
             </p>
           </div>
 
