@@ -149,6 +149,11 @@ export default function HomePage() {
     ])
   }
 
+  // 지갑 항목 클릭 핸들러
+  const handleWalletClick = (code: string) => {
+    router.push(`/wallet/history?currency=${code}`)
+  }
+
   // Navigation items with custom icons
   const navItems = [
     { name: "홈", path: "/home", icon: "/images/icons/home-icon.png" },
@@ -175,7 +180,7 @@ export default function HomePage() {
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-medium text-gray-800">내 지갑</h2>
             <Link
-              href="/wallet/history?currency=전체통화"
+              href="/wallet/history"
               className="group rounded-full bg-gray-50 p-2 transition-all duration-300 hover:bg-blue-50"
             >
               <ChevronRight className="h-5 w-5 text-gray-400 transition-all duration-300 group-hover:text-blue-500" />
@@ -187,7 +192,8 @@ export default function HomePage() {
               {walletBalances.map((balance, index) => (
                 <div
                   key={index}
-                  className="group flex items-center justify-between border-b border-gray-100 pb-3 transition-all duration-300 hover:translate-x-1"
+                  className="group flex cursor-pointer items-center justify-between border-b border-gray-100 pb-3 transition-all duration-300 hover:translate-x-1"
+                  onClick={() => handleWalletClick(balance.code)}
                 >
                   <div className="flex items-center space-x-3">
                     <div className="relative h-10 w-10 overflow-hidden rounded-full border border-gray-100 shadow-sm transition-all duration-300 group-hover:shadow-md">
@@ -236,7 +242,7 @@ export default function HomePage() {
             xmlns="http://www.w3.org/2000/svg"
           >
             <path
-              d="M0,0 C300,30 600,0 900,20 C1000,30 1100,15 1200,0 L1200,30 L0,30 Z"
+              d="M0,0 C300,30 600,0 900,20 C1000,30 1100,15 1200,0 L1200,30 L0 Z"
               fill="#E6F0FF"
               opacity="0.3"
             ></path>

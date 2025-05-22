@@ -3,25 +3,13 @@
 import { useState, useRef, useEffect } from "react"
 import { X, Calendar, Check, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react"
 import ModalPortal from "./modal-portal"
-
-type TransactionType = "exchange" | "transfer" | "charge" | "all"
-type DateRangeType = "전체기간" | "지정기간"
+import type { TransactionType, DateRangeType, FilterOptions } from "@/types"
 
 interface FilterModalProps {
   isOpen: boolean
   onClose: () => void
-  onApply: (filters: {
-    dateRangeType: DateRangeType
-    startDate: string
-    endDate: string
-    transactionType: TransactionType
-  }) => void
-  initialFilters: {
-    dateRangeType: DateRangeType
-    startDate: string
-    endDate: string
-    transactionType: TransactionType
-  }
+  onApply: (filters: FilterOptions) => void
+  initialFilters: FilterOptions
 }
 
 export default function FilterModal({ isOpen, onClose, onApply, initialFilters }: FilterModalProps) {
@@ -185,7 +173,6 @@ export default function FilterModal({ isOpen, onClose, onApply, initialFilters }
   // 거래 유형 텍스트 가져오기 함수
   const getTransactionTypeText = (type: TransactionType) => {
     const typeTexts: Record<TransactionType, string> = {
-      exchange: "환전",
       transfer: "송금",
       charge: "충전",
       all: "전체",
@@ -407,7 +394,6 @@ export default function FilterModal({ isOpen, onClose, onApply, initialFilters }
                   <ul>
                     {[
                       { value: "all", label: "전체" },
-                      { value: "exchange", label: "환전" },
                       { value: "transfer", label: "송금" },
                       { value: "charge", label: "충전" },
                     ].map((type) => (
