@@ -174,9 +174,12 @@ export default function HomePage() {
         <div className="relative z-10">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-medium text-gray-800">내 지갑</h2>
-            <div className="group rounded-full bg-gray-50 p-2 transition-all duration-300 hover:bg-blue-50">
+            <Link
+              href="/wallet/history?currency=전체통화"
+              className="group rounded-full bg-gray-50 p-2 transition-all duration-300 hover:bg-blue-50"
+            >
               <ChevronRight className="h-5 w-5 text-gray-400 transition-all duration-300 group-hover:text-blue-500" />
-            </div>
+            </Link>
           </div>
 
           {hasWallet ? (
