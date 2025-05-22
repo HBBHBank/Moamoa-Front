@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ChevronLeft, X, ChevronDown, ArrowLeft, Check, Plus, AlertCircle } from "lucide-react"
+import { ChevronLeft, X, ChevronDown, Check, Plus, AlertCircle, Delete } from "lucide-react"
 import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
 import ModalPortal from "@/components/modal-portal"
@@ -223,67 +223,71 @@ export default function ChargePage() {
   // Render currency selection step
   const renderCurrencySelection = () => (
     <div className="flex flex-col h-full">
-      <header className="flex items-center justify-between p-4 border-b border-gray-200">
+      <header className="flex items-center justify-between p-4 border-b border-gray-200 bg-white shadow-sm">
         <button onClick={() => router.back()} className="text-gray-700">
           <ChevronLeft size={24} />
         </button>
+        <h1 className="text-lg font-medium">통화 선택</h1>
+        <div className="w-6"></div>
       </header>
 
-      <div className="p-4">
-        <div className="relative mb-4">
-          <div className="flex items-center bg-gray-100 rounded-lg px-4 py-3">
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              className="text-gray-400 mr-2"
-            >
-              <path
-                d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <input
-              type="text"
-              placeholder="국가명 또는 통화 코드 검색"
-              className="bg-transparent w-full outline-none text-gray-700"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          {filteredCurrencies.map((currency) => (
-            <button
-              key={currency.code}
-              className="flex items-center w-full py-3"
-              onClick={() => handleSelectCurrency(currency)}
-            >
-              <div className="relative h-10 w-10 overflow-hidden rounded-full mr-3">
-                <Image
-                  src={currency.flagSrc || "/placeholder.svg"}
-                  alt={currency.country}
-                  width={40}
-                  height={40}
-                  className="object-cover"
+      <div className="relative p-4">
+        <div className="relative z-10">
+          <div className="relative mb-6">
+            <div className="flex items-center bg-gray-100 rounded-lg px-4 py-3 shadow-inner">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className="text-gray-400 mr-2"
+              >
+                <path
+                  d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 />
-              </div>
-              <div className="flex flex-col items-start">
-                <span className="font-medium">
-                  {currency.country} {currency.code}
-                </span>
-                <span className="text-xs text-gray-500">
-                  충전 단위: {currency.chargeUnit.toLocaleString()} {currency.code}
-                </span>
-              </div>
-            </button>
-          ))}
+              </svg>
+              <input
+                type="text"
+                placeholder="국가명 또는 통화 코드 검색"
+                className="bg-transparent w-full outline-none text-gray-700"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {filteredCurrencies.map((currency) => (
+              <button
+                key={currency.code}
+                className="flex items-center w-full py-3 px-4 rounded-xl hover:bg-gray-50 transition-all duration-300 border border-transparent hover:border-gray-200"
+                onClick={() => handleSelectCurrency(currency)}
+              >
+                <div className="relative h-12 w-12 overflow-hidden rounded-full mr-4 border border-gray-100 shadow-sm transition-all duration-300 hover:shadow-md">
+                  <Image
+                    src={currency.flagSrc || "/placeholder.svg"}
+                    alt={currency.country}
+                    width={48}
+                    height={48}
+                    className="object-cover"
+                  />
+                </div>
+                <div className="flex flex-col items-start">
+                  <span className="font-medium text-gray-800">
+                    {currency.country} {currency.code}
+                  </span>
+                  <span className="text-sm text-gray-500">
+                    충전 단위: {currency.chargeUnit.toLocaleString()} {currency.code}
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -292,7 +296,7 @@ export default function ChargePage() {
   // Render amount input step
   const renderAmountInput = () => (
     <div className="flex flex-col h-full">
-      <header className="flex items-center justify-between p-4 border-b border-gray-200">
+      <header className="flex items-center justify-between p-4 border-b border-gray-200 bg-white shadow-sm">
         <button onClick={() => (preselectedCurrency ? router.back() : setStep(0))} className="text-gray-700">
           <ChevronLeft size={24} />
         </button>
@@ -300,88 +304,90 @@ export default function ChargePage() {
         <div className="w-6"></div>
       </header>
 
-      <div className="p-4">
-        {selectedCurrency && (
-          <div className="mb-6">
-            <div className="flex items-center mb-4">
-              <div className="relative h-8 w-8 overflow-hidden rounded-full mr-3">
-                <Image
-                  src={selectedCurrency.flagSrc || "/placeholder.svg"}
-                  alt={selectedCurrency.country}
-                  width={32}
-                  height={32}
-                  className="object-cover"
-                />
-              </div>
-              <div>
-                <span className="font-medium">
-                  {selectedCurrency.country} {selectedCurrency.code}
-                </span>
-                <div className="text-xs text-gray-500">
-                  충전 단위: {selectedCurrency.chargeUnit.toLocaleString()} {selectedCurrency.code}
+      <div className="relative p-4 bg-white">
+        <div className="relative z-10">
+          {selectedCurrency && (
+            <div className="mb-6 bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+              <div className="flex items-center mb-4">
+                <div className="relative h-10 w-10 overflow-hidden rounded-full mr-3 border border-gray-100 shadow-sm">
+                  <Image
+                    src={selectedCurrency.flagSrc || "/placeholder.svg"}
+                    alt={selectedCurrency.country}
+                    width={40}
+                    height={40}
+                    className="object-cover"
+                  />
+                </div>
+                <div>
+                  <span className="font-medium text-gray-800">
+                    {selectedCurrency.country} {selectedCurrency.code}
+                  </span>
+                  <div className="text-xs text-gray-500">
+                    충전 단위: {selectedCurrency.chargeUnit.toLocaleString()} {selectedCurrency.code}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="flex items-center justify-between">
-              <div className="text-2xl font-bold">
-                {amount ? formatCurrency(amount, selectedCurrency.code) : `0 ${selectedCurrency.code}`}
+              <div className="flex items-center justify-between">
+                <div className="text-2xl font-bold text-gray-800">
+                  {amount ? formatCurrency(amount, selectedCurrency.code) : `0 ${selectedCurrency.code}`}
+                </div>
+                {amount && (
+                  <button onClick={() => setAmount("")} className="text-gray-400 hover:text-gray-600 transition-colors">
+                    <X size={20} />
+                  </button>
+                )}
               </div>
-              {amount && (
-                <button onClick={() => setAmount("")} className="text-gray-400">
-                  <X size={20} />
-                </button>
+
+              {amountError && (
+                <div className="mt-2 flex items-center text-red-500 text-sm">
+                  <AlertCircle size={16} className="mr-1" />
+                  {amountError}
+                </div>
               )}
             </div>
+          )}
 
-            {amountError && (
-              <div className="mt-2 flex items-center text-red-500 text-sm">
-                <AlertCircle size={16} className="mr-1" />
-                {amountError}
-              </div>
-            )}
+          <div className="mb-4">
+            <h3 className="text-sm font-medium text-gray-600 mb-2">출금 계좌 선택</h3>
+            <button
+              onClick={() => setShowAccountModal(true)}
+              className="flex items-center justify-between w-full border border-gray-200 rounded-xl p-4 bg-white hover:bg-gray-50 transition-colors shadow-sm hover:shadow-md"
+            >
+              {selectedAccount ? (
+                <>
+                  <div className="flex items-center">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center mr-3 overflow-hidden bg-white border border-gray-100">
+                      <Image
+                        src={selectedAccount.logoSrc || "/placeholder.svg"}
+                        alt={selectedAccount.bankName}
+                        width={40}
+                        height={40}
+                        className="object-contain"
+                      />
+                    </div>
+                    <div className="flex flex-col items-start">
+                      <div className="font-medium text-gray-800">{selectedAccount.bankName}</div>
+                      <div className="text-gray-500 text-sm">{selectedAccount.accountNumber}</div>
+                    </div>
+                  </div>
+                  <ChevronDown size={16} className="text-gray-500" />
+                </>
+              ) : (
+                <span className="text-gray-500 w-full text-center">
+                  출금할 수 있는 계좌가 없습니다. 계좌를 추가해주세요.
+                </span>
+              )}
+            </button>
           </div>
-        )}
-
-        <div className="mb-4">
-          <h3 className="text-sm text-gray-600 mb-2">출금 계좌 선택</h3>
-          <button
-            onClick={() => setShowAccountModal(true)}
-            className="flex items-center justify-between w-full border border-gray-300 rounded-xl p-4 bg-white hover:bg-gray-50 transition-colors"
-          >
-            {selectedAccount ? (
-              <>
-                <div className="flex items-center">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center mr-3 overflow-hidden bg-white">
-                    <Image
-                      src={selectedAccount.logoSrc || "/placeholder.svg"}
-                      alt={selectedAccount.bankName}
-                      width={40}
-                      height={40}
-                      className="object-contain"
-                    />
-                  </div>
-                  <div className="flex flex-col items-start">
-                    <div className="font-medium">{selectedAccount.bankName}</div>
-                    <div className="text-gray-500 text-sm">{selectedAccount.accountNumber}</div>
-                  </div>
-                </div>
-                <ChevronDown size={16} className="text-gray-500" />
-              </>
-            ) : (
-              <span className="text-gray-500 w-full text-center">
-                출금할 수 있는 계좌가 없습니다. 계좌를 추가해주세요.
-              </span>
-            )}
-          </button>
         </div>
       </div>
 
       <div className="mt-auto">
-        <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
-          <div className="flex items-center justify-between mb-3">
+        <div className="px-4 py-3 border-t border-gray-200 bg-white">
+          <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-gray-600">최종 충전액</span>
-            <span className="font-bold text-blue-500">
+            <span className="font-bold text-blue-500 text-2xl">
               {amount ? formatCurrency(amount, selectedCurrency?.code || "") : `0 ${selectedCurrency?.code || ""}`}
             </span>
           </div>
@@ -420,7 +426,9 @@ export default function ChargePage() {
               onClick={handleNext}
               disabled={!amount || !!amountError}
               className={`w-full py-4 rounded-full text-center text-white font-medium text-lg ${
-                amount && !amountError ? "bg-blue-500" : "bg-gray-300"
+                amount && !amountError
+                  ? "bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)]"
+                  : "bg-gray-300"
               }`}
             >
               다음
@@ -428,9 +436,11 @@ export default function ChargePage() {
           ) : (
             <button
               onClick={handleAddAccount}
-              disabled={!amount || !!amountError}
+              disabled={!selectedCurrency}
               className={`w-full py-4 rounded-full text-center text-white font-medium text-lg ${
-                amount && !amountError ? "bg-blue-500" : "bg-gray-300"
+                selectedCurrency
+                  ? "bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)]"
+                  : "bg-gray-300"
               }`}
             >
               계좌 추가하기
@@ -441,58 +451,78 @@ export default function ChargePage() {
     </div>
   )
 
-  // Render PIN input step
+  // Render PIN input step - Updated to match login/signup UI
   const renderPinInput = () => (
     <div className="flex flex-col h-full">
-      <header className="flex items-center justify-between p-4 border-b border-gray-200">
+      <header className="flex items-center justify-between p-4 border-b border-gray-200 bg-white">
         <button onClick={() => setStep(1)} className="text-gray-700">
-          <ArrowLeft size={24} />
+          <ChevronLeft size={24} />
         </button>
+        <h1 className="text-lg font-medium">암호 입력</h1>
+        <div className="w-6"></div>
       </header>
 
-      <div className="flex-1 flex flex-col items-center justify-center p-4">
-        <h2 className="text-xl font-medium mb-2">모아모아 암호 입력</h2>
-        <p className="text-gray-500 mb-6">6자리의 모아모아 암호를 입력해주세요.</p>
-
-        <div className="flex space-x-3 mb-8">
-          {Array(6)
-            .fill(0)
-            .map((_, i) => (
-              <div key={i} className={`w-3 h-3 rounded-full ${i < pin.length ? "bg-blue-500" : "bg-gray-300"}`} />
-            ))}
+      <div className="flex-1 flex flex-col items-center justify-center px-4 pt-16">
+        <div className="w-full max-w-md">
+          <h2 className="mb-6 text-center text-xl font-medium">모아모아 암호를 입력해 주세요.</h2>
+          <div className="flex justify-center space-x-3 py-4">
+            {Array(6)
+              .fill(0)
+              .map((_, index) => (
+                <div
+                  key={index}
+                  className={`h-4 w-4 rounded-full ${index < pin.length ? "bg-[#0DAEFF]" : "bg-gray-200"}`}
+                ></div>
+              ))}
+          </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-8 w-full max-w-xs">
-          {["4", "7", "3", "8", "6", "9", "0", "5", "1", "", "2", "backspace"].map((key, index) => (
-            <button
-              key={index}
-              onClick={() => key && handlePinInput(key)}
-              className={`h-12 w-12 rounded-full flex items-center justify-center text-xl font-medium ${
-                key ? "hover:bg-gray-100" : ""
-              }`}
-              disabled={!key}
-            >
-              {key === "backspace" ? (
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path
-                    d="M12 2L2 12L12 22M22 12H4"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              ) : (
-                key
-              )}
-            </button>
+        <div className="mt-8">
+          {[
+            ["1", "2", "3"],
+            ["4", "5", "6"],
+            ["7", "8", "9"],
+            ["", "0", "backspace"],
+          ].map((row, rowIndex) => (
+            <div key={rowIndex} className="mb-6 flex justify-center space-x-12">
+              {row.map((num, colIndex) => {
+                if (num === "") {
+                  return <div key={colIndex} className="h-12 w-12"></div>
+                }
+                if (num === "backspace") {
+                  return (
+                    <button
+                      key={colIndex}
+                      type="button"
+                      className="flex h-12 w-12 items-center justify-center rounded-full text-gray-600"
+                      onClick={() => handlePinInput("backspace")}
+                    >
+                      <Delete size={24} />
+                    </button>
+                  )
+                }
+                return (
+                  <button
+                    key={colIndex}
+                    type="button"
+                    className="flex h-12 w-12 items-center justify-center rounded-full text-2xl font-medium text-gray-800"
+                    onClick={() => handlePinInput(num)}
+                  >
+                    {num}
+                  </button>
+                )
+              })}
+            </div>
           ))}
         </div>
       </div>
 
       {pin.length === 6 && (
         <div className="p-4">
-          <button onClick={handleNext} className="w-full py-4 bg-blue-500 text-white font-medium rounded-full text-lg">
+          <button
+            onClick={handleNext}
+            className="h-[60px] w-full rounded-[30px] bg-[#0DAEFF] text-center text-lg font-medium text-white shadow-[7px_7px_10px_0px_#D9D9D9] transition-all hover:bg-[#0A9EE8]"
+          >
             확인
           </button>
         </div>
@@ -512,24 +542,54 @@ export default function ChargePage() {
           from { opacity: 0; }
           to { opacity: 1; }
         }
+        
+        @keyframes scaleIn {
+          from { transform: scale(0.95); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
+        }
+        
+        @keyframes pulse {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.05); }
+          100% { transform: scale(1); }
+        }
       `}</style>
       <div
-        className="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center"
+        className="fixed inset-0 z-50"
         style={{
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
+          backdropFilter: "blur(2px)",
           animation: "fadeIn 0.3s ease-out",
         }}
       >
-        <button onClick={() => router.push("/home")} className="absolute top-4 right-4">
-          <X size={24} />
-        </button>
+        <div className="fixed inset-0 flex items-center justify-center">
+          <div
+            className="bg-white w-full max-w-xs rounded-2xl overflow-hidden shadow-xl"
+            style={{
+              animation: "scaleIn 0.3s ease-out",
+            }}
+          >
+            <div className="p-6 text-center">
+              <div
+                className="w-16 h-16 rounded-full bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] flex items-center justify-center mx-auto mb-6 shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3)]"
+                style={{ animation: "pulse 1.5s infinite" }}
+              >
+                <Check size={32} className="text-white" />
+              </div>
 
-        <div className="flex flex-col items-center justify-center p-4 text-center">
-          <div className="w-16 h-16 rounded-full bg-blue-500 flex items-center justify-center mb-6">
-            <Check size={32} className="text-white" />
+              <h2 className="text-xl font-medium mb-2">충전 완료</h2>
+              <p className="text-lg font-bold text-blue-500">
+                {amount ? formatCurrency(amount, selectedCurrency?.code || "") : ""}
+              </p>
+
+              <button
+                onClick={() => router.push("/home")}
+                className="w-full py-4 bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] text-white font-medium rounded-full text-lg mt-6 shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)]"
+              >
+                확인
+              </button>
+            </div>
           </div>
-
-          <h2 className="text-xl font-medium mb-2">충전 완료</h2>
-          <p className="text-lg font-bold">{amount ? formatCurrency(amount, selectedCurrency?.code || "") : ""}</p>
         </div>
       </div>
     </ModalPortal>
@@ -581,7 +641,7 @@ export default function ChargePage() {
                   className="flex items-center w-full p-3 hover:bg-gray-50 rounded-lg transition-colors"
                   onClick={() => handleSelectAccount(account)}
                 >
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center mr-3 overflow-hidden bg-white">
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center mr-3 overflow-hidden bg-white border border-gray-100 shadow-sm">
                     <Image
                       src={account.logoSrc || "/placeholder.svg"}
                       alt={account.bankName}
@@ -592,8 +652,8 @@ export default function ChargePage() {
                   </div>
                   <div className="text-left">
                     <div className="flex items-center">
-                      <span className="font-medium">{account.bankName}</span>
-                      <span className="ml-2 text-xs px-2 py-0.5 bg-gray-100 rounded-full">주계좌</span>
+                      <span className="font-medium text-gray-800">{account.bankName}</span>
+                      <span className="ml-2 text-xs px-2 py-0.5 bg-blue-50 text-blue-500 rounded-full">주계좌</span>
                     </div>
                     <div className="text-gray-500">{account.accountNumber}</div>
                   </div>
@@ -604,7 +664,7 @@ export default function ChargePage() {
 
           <button
             onClick={handleAddAccount}
-            className="w-full py-4 bg-blue-500 text-white font-medium rounded-full flex items-center justify-center text-lg"
+            className="w-full py-4 bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] text-white font-medium rounded-full flex items-center justify-center text-lg shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)]"
           >
             <Plus size={20} className="mr-2" />
             계좌 추가
