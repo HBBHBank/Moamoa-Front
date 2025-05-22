@@ -162,6 +162,12 @@ export default function HomePage() {
     router.push("/wallet/charge")
   }
 
+  // Handle refund button click
+  const handleRefund = () => {
+    // Navigate to refund page
+    router.push("/wallet/refund")
+  }
+
   // 지갑 항목 클릭 핸들러
   const handleWalletClick = (code: string) => {
     router.push(`/wallet/history?currency=${code}`)
