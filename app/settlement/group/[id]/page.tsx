@@ -202,6 +202,52 @@ export default function SettlementGroupPage() {
     }
   }, [groupId, router])
 
+  // 모달 관련 중복 스타일 코드를 제거하고 하나의 공통 스타일로 통합합니다.
+  // 각 모달 컴포넌트에서 반복되는 style jsx global 태그를 하나로 통합합니다.
+
+  // 파일 상단에 useEffect 아래에 다음 코드를 추가합니다:
+  const renderModalStyles = () => (
+    <style jsx global>{`
+      body {
+        overflow: hidden;
+      }
+      
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      
+      @keyframes scaleIn {
+        from { transform: scale(0.95); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+      }
+      
+      @keyframes slideUp {
+        from { transform: translateY(100%); }
+        to { transform: translateY(0); }
+      }
+    `}</style>
+  )
+
+  // 모달 배경과 컨테이너 스타일을 함수로 추출하여 중복 코드를 더 줄입니다.
+  // renderModalStyles() 함수 아래에 다음 함수들을 추가합니다:
+
+  const getModalBackgroundStyle = () => ({
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backdropFilter: "blur(2px)",
+    animation: "fadeIn 0.3s ease-out",
+  })
+
+  const getBottomSheetStyle = () => ({
+    animation: "slideUp 0.3s ease-out",
+    maxHeight: "90vh",
+    overflowY: "auto",
+  })
+
+  const getCenterModalStyle = () => ({
+    animation: "scaleIn 0.3s ease-out",
+  })
+
   // Update invite code expiry timer
   useEffect(() => {
     if (!group || !group.inviteExpiry) return
@@ -859,37 +905,15 @@ export default function SettlementGroupPage() {
       {/* Invite Modal */}
       {showInviteModal && (
         <ModalPortal>
-          <style jsx global>{`
-            body {
-              overflow: hidden;
-            }
-            
-            @keyframes fadeIn {
-              from { opacity: 0; }
-              to { opacity: 1; }
-            }
-            
-            @keyframes slideUp {
-              from { transform: translateY(100%); }
-              to { transform: translateY(0); }
-            }
-          `}</style>
+          {renderModalStyles()}
           <div
             className="fixed inset-0 z-50"
-            style={{
-              backgroundColor: "rgba(0, 0, 0, 0.5)",
-              backdropFilter: "blur(2px)",
-              animation: "fadeIn 0.3s ease-out",
-            }}
+            style={getModalBackgroundStyle()}
             onClick={() => setShowInviteModal(false)}
           >
             <div
               className="fixed bottom-0 left-0 right-0 z-50 rounded-t-xl bg-white p-6 shadow-xl"
-              style={{
-                animation: "slideUp 0.3s ease-out",
-                maxHeight: "90vh",
-                overflowY: "auto",
-              }}
+              style={getBottomSheetStyle()}
               onClick={(e) => e.stopPropagation()}
             >
               <h2 className="mb-4 text-xl font-bold">멤버 초대</h2>
@@ -945,36 +969,16 @@ export default function SettlementGroupPage() {
       {/* Leave Modal */}
       {showLeaveModal && (
         <ModalPortal>
-          <style jsx global>{`
-            body {
-              overflow: hidden;
-            }
-            
-            @keyframes fadeIn {
-              from { opacity: 0; }
-              to { opacity: 1; }
-            }
-            
-            @keyframes scaleIn {
-              from { transform: scale(0.95); opacity: 0; }
-              to { transform: scale(1); opacity: 1; }
-            }
-          `}</style>
+          {renderModalStyles()}
           <div
             className="fixed inset-0 z-50"
-            style={{
-              backgroundColor: "rgba(0, 0, 0, 0.5)",
-              backdropFilter: "blur(2px)",
-              animation: "fadeIn 0.3s ease-out",
-            }}
+            style={getModalBackgroundStyle()}
             onClick={() => setShowLeaveModal(false)}
           >
             <div className="fixed inset-0 flex items-center justify-center">
               <div
                 className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
-                style={{
-                  animation: "scaleIn 0.3s ease-out",
-                }}
+                style={getCenterModalStyle()}
                 onClick={(e) => e.stopPropagation()}
               >
                 <h2 className="mb-4 text-xl font-bold text-red-500">
@@ -1009,37 +1013,15 @@ export default function SettlementGroupPage() {
       {/* Member Selection Modal */}
       {showMemberSelectModal && (
         <ModalPortal>
-          <style jsx global>{`
-            body {
-              overflow: hidden;
-            }
-            
-            @keyframes fadeIn {
-              from { opacity: 0; }
-              to { opacity: 1; }
-            }
-            
-            @keyframes slideUp {
-              from { transform: translateY(100%); }
-              to { transform: translateY(0); }
-            }
-          `}</style>
+          {renderModalStyles()}
           <div
             className="fixed inset-0 z-50"
-            style={{
-              backgroundColor: "rgba(0, 0, 0, 0.5)",
-              backdropFilter: "blur(2px)",
-              animation: "fadeIn 0.3s ease-out",
-            }}
+            style={getModalBackgroundStyle()}
             onClick={() => setShowMemberSelectModal(false)}
           >
             <div
               className="fixed bottom-0 left-0 right-0 z-50 rounded-t-xl bg-white p-6 shadow-xl"
-              style={{
-                animation: "slideUp 0.3s ease-out",
-                maxHeight: "90vh",
-                overflowY: "auto",
-              }}
+              style={getBottomSheetStyle()}
               onClick={(e) => e.stopPropagation()}
             >
               <h2 className="mb-4 text-xl font-bold">정산 멤버 선택</h2>
@@ -1100,36 +1082,16 @@ export default function SettlementGroupPage() {
       {/* Settlement Modal */}
       {showSettlementModal && (
         <ModalPortal>
-          <style jsx global>{`
-            body {
-              overflow: hidden;
-            }
-            
-            @keyframes fadeIn {
-              from { opacity: 0; }
-              to { opacity: 1; }
-            }
-            
-            @keyframes scaleIn {
-              from { transform: scale(0.95); opacity: 0; }
-              to { transform: scale(1); opacity: 1; }
-            }
-          `}</style>
+          {renderModalStyles()}
           <div
             className="fixed inset-0 z-50"
-            style={{
-              backgroundColor: "rgba(0, 0, 0, 0.5)",
-              backdropFilter: "blur(2px)",
-              animation: "fadeIn 0.3s ease-out",
-            }}
+            style={getModalBackgroundStyle()}
             onClick={() => setShowSettlementModal(false)}
           >
             <div className="fixed inset-0 flex items-center justify-center">
               <div
                 className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
-                style={{
-                  animation: "scaleIn 0.3s ease-out",
-                }}
+                style={getCenterModalStyle()}
                 onClick={(e) => e.stopPropagation()}
               >
                 <h2 className="mb-4 text-xl font-bold">정산 시작</h2>
@@ -1186,36 +1148,16 @@ export default function SettlementGroupPage() {
       {/* Activate/Deactivate Info Modal */}
       {showActivateInfoModal && (
         <ModalPortal>
-          <style jsx global>{`
-            body {
-              overflow: hidden;
-            }
-            
-            @keyframes fadeIn {
-              from { opacity: 0; }
-              to { opacity: 1; }
-            }
-            
-            @keyframes scaleIn {
-              from { transform: scale(0.95); opacity: 0; }
-              to { transform: scale(1); opacity: 1; }
-            }
-          `}</style>
+          {renderModalStyles()}
           <div
             className="fixed inset-0 z-50"
-            style={{
-              backgroundColor: "rgba(0, 0, 0, 0.5)",
-              backdropFilter: "blur(2px)",
-              animation: "fadeIn 0.3s ease-out",
-            }}
+            style={getModalBackgroundStyle()}
             onClick={() => setShowActivateInfoModal(false)}
           >
             <div className="fixed inset-0 flex items-center justify-center">
               <div
                 className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
-                style={{
-                  animation: "scaleIn 0.3s ease-out",
-                }}
+                style={getCenterModalStyle()}
                 onClick={(e) => e.stopPropagation()}
               >
                 <h2 className="mb-4 text-xl font-bold">{group.isActive ? "정산 그룹 비활성화" : "정산 그룹 활성화"}</h2>

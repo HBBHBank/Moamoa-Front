@@ -403,48 +403,75 @@ export default function SettlementPage() {
       {/* Settlement Guide Modal */}
       {showSettlementGuideModal && (
         <ModalPortal>
+          <style jsx global>{`
+            body {
+              overflow: hidden;
+            }
+            
+            @keyframes fadeIn {
+              from { opacity: 0; }
+              to { opacity: 1; }
+            }
+            
+            @keyframes scaleIn {
+              from { transform: scale(0.95); opacity: 0; }
+              to { transform: scale(1); opacity: 1; }
+            }
+          `}</style>
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+            className="fixed inset-0 z-50"
             style={{
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
               backdropFilter: "blur(2px)",
+              animation: "fadeIn 0.3s ease-out",
             }}
+            onClick={() => setShowSettlementGuideModal(false)}
           >
-            <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-              <h2 className="mb-4 text-xl font-bold text-blue-600">정산 진행 안내</h2>
-
-              <div className="space-y-4 text-sm text-gray-700">
-                <div className="rounded-lg bg-blue-50 p-3">
-                  <h3 className="mb-2 font-semibold text-blue-700">1. 정산 그룹 생성</h3>
-                  <p>
-                    그룹을 생성하고 멤버들을 초대합니다. 그룹이 활성화되면 방장의 지갑 거래 내역이 자동으로 공유됩니다.
-                  </p>
-                </div>
-
-                <div className="rounded-lg bg-green-50 p-3">
-                  <h3 className="mb-2 font-semibold text-green-700">2. 거래 내역 공유</h3>
-                  <p>그룹이 활성화된 상태에서 방장이 결제한 내역들이 실시간으로 멤버들에게 공유됩니다.</p>
-                </div>
-
-                <div className="rounded-lg bg-orange-50 p-3">
-                  <h3 className="mb-2 font-semibold text-orange-700">3. 정산 시작</h3>
-                  <p>
-                    방장이 정산할 멤버를 선택하고 정산을 시작합니다. 총 금액이 인원수로 나누어져 1인당 정산 금액이
-                    계산됩니다.
-                  </p>
-                </div>
-
-                <div className="rounded-lg bg-purple-50 p-3">
-                  <h3 className="mb-2 font-semibold text-purple-700">4. 송금 완료</h3>
-                  <p>멤버들이 각자의 정산 금액을 방장에게 송금하면 정산이 완료됩니다.</p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setShowSettlementGuideModal(false)}
-                className="mt-6 w-full rounded-lg bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] py-3 text-center font-medium text-white"
+            <div className="fixed inset-0 flex items-center justify-center p-4">
+              <div
+                className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+                style={{
+                  animation: "scaleIn 0.3s ease-out",
+                }}
+                onClick={(e) => e.stopPropagation()}
               >
-                확인
-              </button>
+                <h2 className="mb-4 text-xl font-bold text-blue-600">정산 진행 안내</h2>
+
+                <div className="space-y-4 text-sm text-gray-700">
+                  <div className="rounded-lg bg-blue-50 p-3">
+                    <h3 className="mb-2 font-semibold text-blue-700">1. 정산 그룹 생성</h3>
+                    <p>
+                      그룹을 생성하고 멤버들을 초대합니다. 그룹이 활성화되면 방장의 지갑 거래 내역이 자동으로
+                      공유됩니다.
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg bg-green-50 p-3">
+                    <h3 className="mb-2 font-semibold text-green-700">2. 거래 내역 공유</h3>
+                    <p>그룹이 활성화된 상태에서 방장이 결제한 내역들이 실시간으로 멤버들에게 공유됩니다.</p>
+                  </div>
+
+                  <div className="rounded-lg bg-orange-50 p-3">
+                    <h3 className="mb-2 font-semibold text-orange-700">3. 정산 시작</h3>
+                    <p>
+                      방장이 정산할 멤버를 선택하고 정산을 시작합니다. 총 금액이 인원수로 나누어져 1인당 정산 금액이
+                      계산됩니다.
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg bg-purple-50 p-3">
+                    <h3 className="mb-2 font-semibold text-purple-700">4. 송금 완료</h3>
+                    <p>멤버들이 각자의 정산 금액을 방장에게 송금하면 정산이 완료됩니다.</p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setShowSettlementGuideModal(false)}
+                  className="mt-6 w-full rounded-lg bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] py-3 text-center font-medium text-white"
+                >
+                  확인
+                </button>
+              </div>
             </div>
           </div>
         </ModalPortal>
@@ -453,30 +480,56 @@ export default function SettlementPage() {
       {/* Create Group Modal */}
       {showCreateModal && (
         <ModalPortal>
+          <style jsx global>{`
+            body {
+              overflow: hidden;
+            }
+            
+            @keyframes fadeIn {
+              from { opacity: 0; }
+              to { opacity: 1; }
+            }
+            
+            @keyframes scaleIn {
+              from { transform: scale(0.95); opacity: 0; }
+              to { transform: scale(1); opacity: 1; }
+            }
+          `}</style>
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+            className="fixed inset-0 z-50"
             style={{
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
               backdropFilter: "blur(2px)",
+              animation: "fadeIn 0.3s ease-out",
             }}
+            onClick={() => setShowCreateModal(false)}
           >
-            <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-              <h2 className="mb-4 text-xl font-bold">정산 그룹 생성</h2>
-              <p className="mb-6 text-sm text-gray-600">
-                정산 그룹을 생성하면 초대 코드가 발급됩니다. 이 코드를 공유하여 멤버들을 초대할 수 있습니다.
-              </p>
+            <div className="fixed inset-0 flex items-center justify-center p-4">
+              <div
+                className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+                style={{
+                  animation: "scaleIn 0.3s ease-out",
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h2 className="mb-4 text-xl font-bold">정산 그룹 생성</h2>
+                <p className="mb-6 text-sm text-gray-600">
+                  정산 그룹을 생성하면 초대 코드가 발급됩니다. 이 코드를 공유하여 멤버들을 초대할 수 있습니다.
+                </p>
 
-              <Link
-                href="/settlement/create"
-                className="mb-4 block w-full rounded-lg bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] py-3 text-center font-medium text-white shadow-md"
-              >
-                그룹 생성하기
-              </Link>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="w-full rounded-lg border border-gray-300 py-3 text-center font-medium text-gray-700"
-              >
-                취소
-              </button>
+                <Link
+                  href="/settlement/create"
+                  className="mb-4 block w-full rounded-lg bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] py-3 text-center font-medium text-white shadow-md"
+                >
+                  그룹 생성하기
+                </Link>
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="w-full rounded-lg border border-gray-300 py-3 text-center font-medium text-gray-700"
+                >
+                  취소
+                </button>
+              </div>
             </div>
           </div>
         </ModalPortal>
@@ -485,54 +538,85 @@ export default function SettlementPage() {
       {/* Join Group Modal */}
       {showJoinModal && (
         <ModalPortal>
+          <style jsx global>{`
+            body {
+              overflow: hidden;
+            }
+            
+            @keyframes fadeIn {
+              from { opacity: 0; }
+              to { opacity: 1; }
+            }
+            
+            @keyframes scaleIn {
+              from { transform: scale(0.95); opacity: 0; }
+              to { transform: scale(1); opacity: 1; }
+            }
+          `}</style>
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+            className="fixed inset-0 z-50"
             style={{
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
               backdropFilter: "blur(2px)",
+              animation: "fadeIn 0.3s ease-out",
+            }}
+            onClick={() => {
+              setShowJoinModal(false)
+              setInviteCode("")
+              setInviteCodeError("")
+              setRemainingAttempts(5)
             }}
           >
-            <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
-              <h2 className="mb-4 text-xl font-bold">정산 그룹 참여</h2>
-              <p className="mb-6 text-sm text-gray-600">
-                정산 그룹 방장에게 받은 초대 코드를 입력하여 그룹에 참여하세요.
-              </p>
-
-              <div className="mb-4">
-                <label htmlFor="inviteCode" className="mb-2 block text-sm font-medium text-gray-700">
-                  초대 코드
-                </label>
-                <input
-                  type="text"
-                  id="inviteCode"
-                  value={inviteCode}
-                  onChange={(e) => setInviteCode(e.target.value)}
-                  placeholder="초대 코드를 입력하세요"
-                  className={`w-full rounded-lg border ${
-                    inviteCodeError ? "border-red-500" : "border-gray-300"
-                  } p-3 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500`}
-                  disabled={remainingAttempts <= 0}
-                />
-                {inviteCodeError && <p className="mt-1 text-sm text-red-500">{inviteCodeError}</p>}
-              </div>
-
-              <button
-                onClick={handleInviteCodeSubmit}
-                disabled={remainingAttempts <= 0}
-                className="mb-4 w-full rounded-lg bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] py-3 text-center font-medium text-white shadow-md disabled:bg-gray-300"
-              >
-                참여하기
-              </button>
-              <button
-                onClick={() => {
-                  setShowJoinModal(false)
-                  setInviteCode("")
-                  setInviteCodeError("")
-                  setRemainingAttempts(5)
+            <div className="fixed inset-0 flex items-center justify-center p-4">
+              <div
+                className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+                style={{
+                  animation: "scaleIn 0.3s ease-out",
                 }}
-                className="w-full rounded-lg border border-gray-300 py-3 text-center font-medium text-gray-700"
+                onClick={(e) => e.stopPropagation()}
               >
-                취소
-              </button>
+                <h2 className="mb-4 text-xl font-bold">정산 그룹 참여</h2>
+                <p className="mb-6 text-sm text-gray-600">
+                  정산 그룹 방장에게 받은 초대 코드를 입력하여 그룹에 참여하세요.
+                </p>
+
+                <div className="mb-4">
+                  <label htmlFor="inviteCode" className="mb-2 block text-sm font-medium text-gray-700">
+                    초대 코드
+                  </label>
+                  <input
+                    type="text"
+                    id="inviteCode"
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(e.target.value)}
+                    placeholder="초대 코드를 입력하세요"
+                    className={`w-full rounded-lg border ${
+                      inviteCodeError ? "border-red-500" : "border-gray-300"
+                    } p-3 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                    disabled={remainingAttempts <= 0}
+                  />
+                  {inviteCodeError && <p className="mt-1 text-sm text-red-500">{inviteCodeError}</p>}
+                </div>
+
+                <button
+                  onClick={handleInviteCodeSubmit}
+                  disabled={remainingAttempts <= 0}
+                  className="mb-4 w-full rounded-lg bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] py-3 text-center font-medium text-white shadow-md disabled:bg-gray-300"
+                >
+                  참여하기
+                </button>
+                <button
+                  onClick={() => {
+                    setShowJoinModal(false)
+                    setInviteCode("")
+                    setInviteCodeError("")
+                    setRemainingAttempts(5)
+                  }}
+                  className="w-full rounded-lg border border-gray-300 py-3 text-center font-medium text-gray-700"
+                >
+                  취소
+                </button>
+              </div>
             </div>
           </div>
         </ModalPortal>
