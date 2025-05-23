@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect } from "react"
 import { ChevronLeft, Share2, Clock, Copy, RefreshCw, Check, AlertCircle } from "lucide-react"
 import Link from "next/link"
@@ -238,10 +240,10 @@ export default function SettlementGroupPage() {
     animation: "fadeIn 0.3s ease-out",
   })
 
-  const getBottomSheetStyle = () => ({
+  const getBottomSheetStyle = (): React.CSSProperties => ({
     animation: "slideUp 0.3s ease-out",
     maxHeight: "90vh",
-    overflowY: "auto",
+    overflowY: "auto" as const,
   })
 
   const getCenterModalStyle = () => ({
