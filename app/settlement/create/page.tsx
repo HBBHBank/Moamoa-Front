@@ -5,6 +5,8 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { ChevronLeft, Check, AlertCircle } from "lucide-react"
 import Link from "next/link"
+// Image import 제거하고 사용하지 않음
+// import Image from "next/image"
 import { useRouter } from "next/navigation"
 
 type WalletBalance = {
