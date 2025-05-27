@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { ChevronLeft, X, Delete } from "lucide-react"
 import Link from "next/link"
@@ -9,9 +8,11 @@ import { useRouter } from "next/navigation"
 
 export default function LoginPage() {
   const router = useRouter()
+
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPasswordInput, setShowPasswordInput] = useState(false)
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({})
 
   const validateEmail = (email: string) => {
     const regex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
@@ -20,13 +21,14 @@ export default function LoginPage() {
 
   const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEmail(e.target.value)
+    setErrors((prev) => ({ ...prev, email: undefined }))
   }
 
   const handleNextStep = (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!validateEmail(email)) {
-      alert("유효한 이메일 형식이 아닙니다.")
+      setErrors({ email: "유효한 이메일 형식이 아닙니다." })
       return
     }
 
@@ -36,6 +38,7 @@ export default function LoginPage() {
   const handleNumpadClick = (digit: string) => {
     if (password.length < 6) {
       setPassword(password + digit)
+      setErrors((prev) => ({ ...prev, password: undefined }))
     }
   }
 
@@ -43,40 +46,64 @@ export default function LoginPage() {
     setPassword(password.slice(0, -1))
   }
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (password.length !== 6) {
-      alert("비밀번호는 6자리 숫자여야 합니다.")
+      setErrors({ password: "비밀번호는 6자리 숫자여야 합니다." })
       return
     }
 
-    // Here you would typically authenticate with your backend API
-    console.log("Login attempt with:", { email, password })
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}/api/v1/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      })
 
-    // Set login state
-    localStorage.setItem("isLoggedIn", "true")
-    localStorage.setItem("userEmail", email)
+      if (!res.ok) {
+        const errorBody = await res.json()
 
-    // Redirect to home page
-    router.push("/home")
+        if (errorBody.fieldErrors) {
+          const fieldErrors = errorBody.fieldErrors.reduce((acc: any, curr: any) => {
+            acc[curr.field] = curr.message
+            return acc
+          }, {})
+          setErrors(fieldErrors)
+        } else {
+          alert(errorBody.message || "로그인에 실패했습니다.")
+        }
+
+        return
+      }
+
+      const data = await res.json()
+
+      localStorage.setItem("isLoggedIn", "true")
+      localStorage.setItem("userEmail", email)
+      localStorage.setItem("accessToken", data.accessToken)
+      localStorage.setItem("refreshToken", data.refreshToken)
+
+      router.push("/home")
+    } catch (error) {
+      console.error(error)
+      alert("서버 오류가 발생했습니다.")
+    }
   }
 
-  // Render password dots
-  const renderPasswordDots = () => {
-    return (
-      <div className="flex justify-center space-x-3 py-4">
-        {Array(6)
-          .fill(0)
-          .map((_, index) => (
-            <div
-              key={index}
-              className={`h-4 w-4 rounded-full ${index < password.length ? "bg-[#0DAEFF]" : "bg-gray-200"}`}
-            ></div>
-          ))}
-      </div>
-    )
-  }
+  const renderPasswordDots = () => (
+    <div className="flex justify-center space-x-3 py-4">
+      {Array(6)
+        .fill(0)
+        .map((_, index) => (
+          <div
+            key={index}
+            className={`h-4 w-4 rounded-full ${index < password.length ? "bg-[#0DAEFF]" : "bg-gray-200"}`}
+          />
+        ))}
+    </div>
+  )
 
-  // Render numpad
   const renderNumpad = () => {
     const numbers = [
       ["1", "2", "3"],
@@ -90,9 +117,7 @@ export default function LoginPage() {
         {numbers.map((row, rowIndex) => (
           <div key={rowIndex} className="mb-6 flex justify-center space-x-12">
             {row.map((num, colIndex) => {
-              if (num === "") {
-                return <div key={colIndex} className="h-12 w-12"></div>
-              }
+              if (num === "") return <div key={colIndex} className="h-12 w-12" />
               if (num === "backspace") {
                 return (
                   <button
@@ -140,6 +165,9 @@ export default function LoginPage() {
             <h2 className="mb-6 text-center text-xl font-medium">모아모아 암호를 입력해 주세요.</h2>
             {renderPasswordDots()}
             {renderNumpad()}
+            {errors.password && (
+              <p className="mt-4 text-center text-sm text-red-500">{errors.password}</p>
+            )}
           </div>
         </div>
 
@@ -148,7 +176,7 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={handleLogin}
-              className="h-[60px] w-full rounded-[30px] bg-[#0DAEFF] text-center text-lg font-medium text-white shadow-[7px_7px_10px_0px_#D9D9D9] transition-all hover:bg-[#0A9EE8]"
+              className="h-[60px] w-full rounded-[30px] bg-[#0DAEFF] text-lg font-medium text-white shadow-md hover:bg-[#0A9EE8]"
             >
               로그인
             </button>
@@ -160,7 +188,6 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
-      {/* Header */}
       <header className="flex items-center justify-between border-b border-gray-200 p-4">
         <Link href="/" className="text-gray-700">
           <ChevronLeft size={24} />
@@ -182,15 +209,16 @@ export default function LoginPage() {
               id="email"
               value={email}
               onChange={handleEmailChange}
-              className="w-full rounded-lg border border-gray-300 p-3 focus:border-[#0DAEFF] focus:outline-none focus:ring-1 focus:ring-[#0DAEFF]"
+              className="w-full rounded-lg border border-gray-300 p-3 focus:ring-[#0DAEFF]"
               placeholder="example@email.com"
             />
+            {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
           </div>
 
           <div className="pt-6">
             <button
               type="submit"
-              className="h-[60px] w-full rounded-[30px] bg-[#0DAEFF] text-center text-lg font-medium text-white shadow-[7px_7px_10px_0px_#D9D9D9] transition-all hover:bg-[#0A9EE8]"
+              className="h-[60px] w-full rounded-[30px] bg-[#0DAEFF] text-lg font-medium text-white shadow-md hover:bg-[#0A9EE8]"
             >
               다음
             </button>
