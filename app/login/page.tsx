@@ -53,7 +53,7 @@ export default function LoginPage() {
     }
 
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}/api/v1/auth/login`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}/api/v1/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -61,29 +61,27 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       })
 
-      if (!res.ok) {
-        const errorBody = await res.json()
+      const result = await response.json()
 
-        if (errorBody.fieldErrors) {
-          const fieldErrors = errorBody.fieldErrors.reduce((acc: any, curr: any) => {
+      if (!response.ok || !result?.accessToken) {
+        console.warn("로그인 실패 응답:", result)
+        if (result?.fieldErrors) {
+          const fieldErrors = result.fieldErrors.reduce((acc: any, curr: any) => {
             acc[curr.field] = curr.message
             return acc
           }, {})
           setErrors(fieldErrors)
         } else {
-          alert(errorBody.message || "로그인에 실패했습니다.")
+          alert(result?.message || "로그인에 실패했습니다.")
         }
-
         return
       }
 
-      const data = await res.json()
-
+      const { accessToken, refreshToken, userId } = result
       localStorage.setItem("isLoggedIn", "true")
       localStorage.setItem("userEmail", email)
-      localStorage.setItem("accessToken", data.accessToken)
-      localStorage.setItem("refreshToken", data.refreshToken)
-
+      localStorage.setItem("accessToken", accessToken)
+      localStorage.setItem("refreshToken", refreshToken)
       router.push("/home")
     } catch (error) {
       console.error(error)
@@ -100,7 +98,7 @@ export default function LoginPage() {
             key={index}
             className={`h-4 w-4 rounded-full ${index < password.length ? "bg-[#0DAEFF]" : "bg-gray-200"}`}
           />
-        ))}
+      ))}
     </div>
   )
 
