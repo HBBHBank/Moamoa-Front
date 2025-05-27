@@ -36,7 +36,7 @@ export default function TermsPage() {
 
     // Check if all individual terms are checked
     const allChecked =
-      newAgreements.serviceTermsAgreed && newAgreements.privacyPolicyAgreed && newAgreements.marketingAgreed
+      newAgreements.serviceTermsAgreed && newAgreements.privacyPolicyAgreed
 
     setAgreements({
       ...newAgreements,
