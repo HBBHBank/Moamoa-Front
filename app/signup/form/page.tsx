@@ -153,7 +153,7 @@ export default function SignupFormPage() {
       console.log("회원가입 성공:", result)
       localStorage.setItem("isLoggedIn", "true")
       localStorage.setItem("userEmail", formData.email)
-      router.push("/home")
+      router.push("/")
     } catch (error) {
       console.error(error)
       alert("회원가입에 실패했습니다.")
