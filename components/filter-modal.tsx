@@ -3,7 +3,14 @@
 import { useState, useRef, useEffect } from "react"
 import { X, Calendar, Check, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react"
 import ModalPortal from "./modal-portal"
-import type { TransactionType, DateRangeType, FilterOptions } from "@/types"
+import { DateRangeType, TransactionType } from "@/types"
+
+type FilterOptions = {
+  dateRangeType: DateRangeType
+  startDate: string
+  endDate: string
+  transactionType: TransactionType
+}
 
 interface FilterModalProps {
   isOpen: boolean
@@ -22,16 +29,13 @@ export default function FilterModal({ isOpen, onClose, onApply, initialFilters }
   const [isTransactionTypeDropdownOpen, setIsTransactionTypeDropdownOpen] = useState(false)
   const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth())
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear())
-  const [isAnimating, setIsAnimating] = useState(false)
 
   const modalRef = useRef<HTMLDivElement>(null)
-  const today = new Date().toISOString().split("T")[0]
   const monthNames = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"]
 
   // 모달 애니메이션 처리
   useEffect(() => {
     if (isOpen) {
-      setIsAnimating(true)
       document.body.style.overflow = "hidden"
     } else {
       document.body.style.overflow = ""
@@ -172,9 +176,14 @@ export default function FilterModal({ isOpen, onClose, onApply, initialFilters }
 
   // 거래 유형 텍스트 가져오기 함수
   const getTransactionTypeText = (type: TransactionType) => {
-    const typeTexts: Record<TransactionType, string> = {
-      transfer: "송금",
-      charge: "충전",
+  const typeTexts: Record<TransactionType, string> = {
+      CHARGE: "충전",
+      TRANSFER_OUT: "송금",
+      TRANSFER_IN: "입금",
+      QR_PAYMENT: "QR 결제",
+      SETTLEMENT_SEND: "정산 송금",
+      SETTLEMENT_RECEIVE: "정산 입금",
+      WITHDRAWAL: "출금",
       all: "전체",
     }
     return typeTexts[type]
@@ -322,7 +331,7 @@ export default function FilterModal({ isOpen, onClose, onApply, initialFilters }
                   dateRangeType === "전체기간"
                     ? "border-[#4DA9FF] bg-blue-50 text-[#4DA9FF]"
                     : "border-gray-300 bg-white text-gray-700"
-                } py-3 text-center font-medium transition-all`}
+                } py-3 text-center font-medium transition-all cursor-pointer`}
                 onClick={() => setDateRangeType("전체기간")}
               >
                 전체기간
@@ -332,7 +341,7 @@ export default function FilterModal({ isOpen, onClose, onApply, initialFilters }
                   dateRangeType === "지정기간"
                     ? "border-[#4DA9FF] bg-blue-50 text-[#4DA9FF]"
                     : "border-gray-300 bg-white text-gray-700"
-                } py-3 text-center font-medium transition-all`}
+                } py-3 text-center font-medium transition-all cursor-pointer`}
                 onClick={() => setDateRangeType("지정기간")}
               >
                 지정기간
@@ -347,7 +356,7 @@ export default function FilterModal({ isOpen, onClose, onApply, initialFilters }
                       onClick={() => openDatePicker(true)}
                       className={`flex w-full items-center justify-between rounded-lg border ${
                         showStartDatePicker ? "border-[#4DA9FF]" : "border-gray-200"
-                      } bg-white px-3 py-2 text-left`}
+                      } bg-white px-3 py-2 text-left cursor-pointer`}
                     >
                       <span>{formatDateForDisplay(startDate)}</span>
                       <Calendar size={16} className="text-gray-500" />
@@ -359,7 +368,7 @@ export default function FilterModal({ isOpen, onClose, onApply, initialFilters }
                       onClick={() => openDatePicker(false)}
                       className={`flex w-full items-center justify-between rounded-lg border ${
                         showEndDatePicker ? "border-[#4DA9FF]" : "border-gray-200"
-                      } bg-white px-3 py-2 text-left`}
+                      } bg-white px-3 py-2 text-left cursor-pointer`}
                     >
                       <span>{formatDateForDisplay(endDate)}</span>
                       <Calendar size={16} className="text-gray-500" />
@@ -380,7 +389,7 @@ export default function FilterModal({ isOpen, onClose, onApply, initialFilters }
             <div className="relative">
               <button
                 onClick={toggleTransactionTypeDropdown}
-                className="flex w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-4 py-3 text-left"
+                className="flex w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-4 py-3 text-left cursor-pointer"
               >
                 <span>{getTransactionTypeText(transactionType)}</span>
                 <ChevronDown
@@ -394,13 +403,14 @@ export default function FilterModal({ isOpen, onClose, onApply, initialFilters }
                   <ul>
                     {[
                       { value: "all", label: "전체" },
-                      { value: "transfer", label: "송금" },
-                      { value: "charge", label: "충전" },
+                      { value: "CHARGE", label: "충전" },
+                      { value: "TRANSFER_OUT", label: "송금" },
+                      { value: "TRANSFER_IN", label: "입금" },
                     ].map((type) => (
                       <li key={type.value}>
                         <button
                           onClick={() => selectTransactionType(type.value as TransactionType)}
-                          className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-gray-50"
+                          className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-gray-50 cursor-pointer"
                         >
                           <span>{type.label}</span>
                           {transactionType === type.value && <Check size={16} className="text-[#4DA9FF]" />}
@@ -416,7 +426,7 @@ export default function FilterModal({ isOpen, onClose, onApply, initialFilters }
           {/* Apply Button */}
           <button
             onClick={handleApply}
-            className="w-full rounded-lg bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] py-4 text-center text-lg font-medium text-white shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)]"
+            className="w-full rounded-lg bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] py-4 text-center text-lg font-medium text-white shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)] cursor-pointer"
           >
             적용
           </button>
