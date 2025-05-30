@@ -83,7 +83,7 @@ export default function TermsPage() {
       <div className="flex-1 overflow-auto p-4">
         {/* More options button */}
         <div className="mb-4 flex justify-center">
-          <button className="text-gray-500">
+          <button className="text-gray-500 cursor-pointer">
             <span className="text-2xl">...</span>
           </button>
         </div>
@@ -94,10 +94,10 @@ export default function TermsPage() {
             <div
               className={`flex h-8 w-8 items-center justify-center rounded-full ${
                 agreements.all ? "bg-[#4DA9FF]" : "bg-gray-200"
-              }`}
+              } cursor-pointer`}
               onClick={handleAllChange}
             >
-              <Check className="h-5 w-5 text-white" />
+              <Check className="h-5 w-5 text-white cursor-pointer" />
             </div>
             <span className="text-base font-medium">약관 전체 동의</span>
           </label>
@@ -114,10 +114,10 @@ export default function TermsPage() {
               <div
                 className={`flex h-8 w-8 items-center justify-center rounded-full ${
                   agreements.serviceTermsAgreed ? "bg-[#4DA9FF]" : "bg-gray-200"
-                }`}
+                } cursor-pointer`}
                 onClick={() => handleSingleChange("serviceTermsAgreed")}
               >
-                <Check className="h-5 w-5 text-white" />
+                <Check className="h-5 w-5 text-white cursor-pointer" />
               </div>
               <span className="text-base">[필수] 서비스 이용 약관 동의</span>
             </label>
@@ -130,10 +130,10 @@ export default function TermsPage() {
               <div
                 className={`flex h-8 w-8 items-center justify-center rounded-full ${
                   agreements.privacyPolicyAgreed ? "bg-[#4DA9FF]" : "bg-gray-200"
-                }`}
+                } cursor-pointer`}
                 onClick={() => handleSingleChange("privacyPolicyAgreed")}
               >
-                <Check className="h-5 w-5 text-white" />
+                <Check className="h-5 w-5 text-white cursor-pointer" />
               </div>
               <span className="text-base">[필수] 개인정보 처리방침 동의</span>
             </label>
@@ -146,10 +146,10 @@ export default function TermsPage() {
               <div
                 className={`flex h-8 w-8 items-center justify-center rounded-full ${
                   agreements.marketingAgreed ? "bg-[#4DA9FF]" : "bg-gray-200"
-                }`}
+                } cursor-pointer`}
                 onClick={() => handleSingleChange("marketingAgreed")}
               >
-                <Check className="h-5 w-5 text-white" />
+                <Check className="h-5 w-5 text-white cursor-pointer" />
               </div>
               <span className="text-base">[선택] 마케팅 정보 수신 동의</span>
             </label>
@@ -163,7 +163,7 @@ export default function TermsPage() {
         <button
           className={`h-[60px] w-full rounded-[30px] text-center text-lg font-medium text-white ${
             isAllRequiredChecked ? "bg-[#0DAEFF]" : "bg-gray-300"
-          }`}
+          } cursor-pointer`}
           disabled={!isAllRequiredChecked}
           onClick={handleConfirm}
         >
