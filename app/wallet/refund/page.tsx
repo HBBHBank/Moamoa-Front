@@ -5,6 +5,8 @@ import { ChevronLeft, X, ChevronDown, Check, AlertCircle, Delete } from "lucide-
 import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
 import ModalPortal from "@/components/modal-portal"
+import { getValidToken } from "@/lib/auth"
+import { getCurrencySymbol, getCountryName, mapCurrencyToFlag } from "@/lib/utils"
 
 type CurrencyInfo = {
   code: string
@@ -14,10 +16,30 @@ type CurrencyInfo = {
 }
 
 type BankAccount = {
-  bankName: string
-  accountNumber: string
-  logoSrc: string
-  currency: string
+  id: number;
+  accountNumber: string;
+  bankName: string;
+  bankLogo: string;
+  currency: string;
+}
+
+type PointWithdrawRequestDto = {
+  bankAccount: string;
+  amount: number;
+  password: string;
+}
+
+type PointWithdrawResponseDto = {
+  transactionId: number;
+  fromWalletNumber: string;
+  toBankAccount: string;
+  amount: number;
+  currency: string;
+}
+
+type WalletResponse = {
+  currencyCode: string;
+  balance: number;
 }
 
 export default function RefundPage() {
@@ -33,26 +55,58 @@ export default function RefundPage() {
   const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false)
   const [searchQuery, setSearchQuery] = useState<string>("")
   const [showAccountModal, setShowAccountModal] = useState<boolean>(false)
-  const [accounts, setAccounts] = useState<BankAccount[]>([])
-  const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null)
   const [filteredAccounts, setFilteredAccounts] = useState<BankAccount[]>([])
   const [amountError, setAmountError] = useState<string>("")
   const [walletBalances, setWalletBalances] = useState<CurrencyInfo[]>([])
+  const [transactionId, setTransactionId] = useState<number | null>(null)
+  const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null)
 
   // Load wallet balances and accounts from localStorage on mount
   useEffect(() => {
-    const storedBalances = localStorage.getItem("walletBalances")
-    if (storedBalances) {
-      const parsedBalances = JSON.parse(storedBalances)
-      setWalletBalances(parsedBalances)
-    }
+    const fetchWallets = async () => {
+      try {
+        const token = await getValidToken();
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/wallet/all`, {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          credentials: "include",
+        });
 
-    const storedAccounts = localStorage.getItem("bankAccounts")
-    if (storedAccounts) {
-      const parsedAccounts = JSON.parse(storedAccounts)
-      setAccounts(parsedAccounts)
-    }
-  }, [])
+        if (!response.ok) {
+          throw new Error('Failed to fetch wallets');
+        }
+
+        const result = await response.json();
+        // result.result 또는 result.data 중 실제 배열을 사용
+        const walletArr = Array.isArray(result.result)
+          ? result.result
+          : Array.isArray(result.data)
+            ? result.data
+            : [];
+        if (!Array.isArray(walletArr)) {
+          throw new Error('Invalid response format');
+        }
+
+        const walletInfos: CurrencyInfo[] = walletArr.map((wallet: WalletResponse) => ({
+          country: getCountryName(wallet.currencyCode),
+          code: wallet.currencyCode,
+          flagSrc: `/images/flags/${mapCurrencyToFlag(wallet.currencyCode)}`,
+          amount: wallet.balance,
+        }));
+
+        setWalletBalances(walletInfos);
+      } catch (error) {
+        console.error('Error fetching wallets:', error);
+        if (error instanceof Error && error.message === "No token found") {
+          router.push("/login");
+        }
+      }
+    };
+
+    fetchWallets();
+  }, []);
 
   // Set preselected currency if provided in URL
   useEffect(() => {
@@ -67,21 +121,52 @@ export default function RefundPage() {
 
   // Filter accounts by selected currency
   useEffect(() => {
-    if (selectedCurrency && accounts.length > 0) {
-      const filtered = accounts.filter((account) => account.currency === selectedCurrency.code)
-      setFilteredAccounts(filtered)
-
-      // If there's only one account for this currency, select it automatically
-      if (filtered.length === 1) {
-        setSelectedAccount(filtered[0])
-      } else {
-        setSelectedAccount(null)
+    const fetchBankAccounts = async (currencyCode: string) => {
+      try {
+        const token = await getValidToken();
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/v1/wallet/bank-accounts?currencyCode=${currencyCode}`,
+          {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            credentials: "include",
+          }
+        );
+        if (!response.ok) {
+          setFilteredAccounts([]);
+          setSelectedAccount(null);
+          return;
+        }
+        const result = await response.json();
+        const bankAccounts: BankAccount[] = Array.isArray(result.result)
+          ? result.result.map((account: { id: number; accountNumber: string; currency: string }) => ({
+              id: account.id,
+              accountNumber: account.accountNumber,
+              bankName: "환비 은행",
+              bankLogo: "/images/hwanbi-bank-logo.png",
+              currency: account.currency,
+            }))
+          : [];
+        setFilteredAccounts(bankAccounts);
+        if (bankAccounts.length === 1) {
+          setSelectedAccount(bankAccounts[0]);
+        } else {
+          setSelectedAccount(null);
+        }
+      } catch {
+        setFilteredAccounts([]);
+        setSelectedAccount(null);
       }
+    };
+    if (selectedCurrency) {
+      fetchBankAccounts(selectedCurrency.code);
     } else {
-      setFilteredAccounts([])
-      setSelectedAccount(null)
+      setFilteredAccounts([]);
+      setSelectedAccount(null);
     }
-  }, [selectedCurrency, accounts])
+  }, [selectedCurrency]);
 
   // Validate amount whenever it changes
   useEffect(() => {
@@ -159,35 +244,102 @@ export default function RefundPage() {
   }
 
   // Handle next step in refund process
-  const handleNext = () => {
+  const handleNext = async () => {
     if (step === 1 && amount && selectedAccount && validateAmount()) {
       setStep(2)
-    } else if (step === 2 && pin.length === 6) {
-      // Show success modal
-      setShowSuccessModal(true)
+    } else if (step === 2 && pin.length === 6 && selectedAccount) {
+      try {
+        const token = await getValidToken();
+        console.log('Refund API params:', { bankAccount: selectedAccount.accountNumber, amount: Number(amount), password: pin });
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/withdraw`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            bankAccount: selectedAccount.accountNumber,
+            amount: Number(amount),
+            password: pin,
+          } as PointWithdrawRequestDto),
+        });
 
-      // After 2 seconds, redirect to home
-      setTimeout(() => {
-        // Update wallet balance
-        if (selectedCurrency) {
-          const walletBalances = JSON.parse(localStorage.getItem("walletBalances") || "[]")
-          const existingWalletIndex = walletBalances.findIndex((wallet: any) => wallet.code === selectedCurrency.code)
-
-          if (existingWalletIndex >= 0) {
-            // Update existing wallet
-            walletBalances[existingWalletIndex].amount -= Number.parseInt(amount)
-
-            // If balance becomes 0, consider removing the wallet
-            if (walletBalances[existingWalletIndex].amount <= 0) {
-              walletBalances.splice(existingWalletIndex, 1)
-            }
+        if (!response.ok) {
+          const errorData = await response.json();
+          switch (errorData.errorCode) {
+            case "WDR_001":
+              alert("출금할 지갑 정보를 찾을 수 없습니다.");
+              break;
+            case "WDR_002":
+              alert("출금할 지갑에 잔액이 부족합니다.");
+              break;
+            case "WDR_003":
+              alert("연결된 외부 계좌 정보를 찾을 수 없습니다.");
+              break;
+            case "WDR_004":
+              alert("출금 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
+              break;
+            case "WDR_005":
+              alert("출금 금액이 유효하지 않습니다.");
+              break;
+            case "HWANBEE_001":
+              alert("인증 코드 요청에 실패했습니다.");
+              break;
+            case "HWANBEE_002":
+              alert("인증 코드 검증에 실패했습니다.");
+              break;
+            case "HWANBEE_003":
+              alert("계좌 정보가 올바르지 않거나 소유자가 일치하지 않습니다.");
+              break;
+            case "HWANBEE_004":
+              alert("계좌 인증에 실패했습니다.");
+              break;
+            case "HWANBEE_005":
+              alert("계좌 연결 중 오류가 발생했습니다.");
+              break;
+            case "HWANBEE_006":
+              alert("환비 토큰 발급에 실패했습니다.");
+              break;
+            case "HWANBEE_007":
+              alert("환비 송금 API 요청에 실패했습니다.");
+              break;
+            case "HWANBEE_008":
+              alert("환전 정보 조회에 실패했습니다.");
+              break;
+            case "HWANBEE_009":
+              alert("환전 진행에 실패했습니다.");
+              break;
+            default:
+              alert(errorData.message || "환불 처리 중 알 수 없는 오류가 발생했습니다.");
           }
-
-          localStorage.setItem("walletBalances", JSON.stringify(walletBalances))
+          return;
         }
 
-        router.push("/home")
-      }, 2000)
+        const result = await response.json();
+        if (!result.result) {
+          throw new Error("Invalid response format");
+        }
+
+        const responseData = result.result as PointWithdrawResponseDto;
+        setTransactionId(responseData.transactionId);
+
+        // Show success modal
+        setShowSuccessModal(true);
+
+        // After 2 seconds, redirect to home
+        setTimeout(() => {
+          router.push("/home");
+        }, 2000);
+      } catch (error) {
+        console.error("Error processing refund:", error);
+        if (error instanceof Error && error.message === "No token found") {
+          router.push("/login");
+        } else {
+          // Show error message to user
+          alert(error instanceof Error ? error.message : "환불 처리 중 오류가 발생했습니다.");
+        }
+      }
     }
   }
 
@@ -204,25 +356,11 @@ export default function RefundPage() {
     return `${numValue.toLocaleString()} ${code}`
   }
 
-  // Get currency symbol
-  const getCurrencySymbol = (code: string) => {
-    const symbols: Record<string, string> = {
-      KRW: "₩",
-      USD: "$",
-      EUR: "€",
-      JPY: "¥",
-      CNY: "¥",
-      VND: "₫",
-      INR: "₹",
-    }
-    return symbols[code] || ""
-  }
-
   // Render currency selection step
   const renderCurrencySelection = () => (
     <div className="flex flex-col h-full">
       <header className="flex items-center justify-between p-4 border-b border-gray-200 bg-white shadow-sm">
-        <button onClick={() => router.back()} className="text-gray-700">
+        <button onClick={() => router.back()} className="text-gray-700 cursor-pointer">
           <ChevronLeft size={24} />
         </button>
         <h1 className="text-lg font-medium">통화 선택</h1>
@@ -269,7 +407,7 @@ export default function RefundPage() {
                 >
                   <div className="relative h-12 w-12 overflow-hidden rounded-full mr-4 border border-gray-100 shadow-sm transition-all duration-300 hover:shadow-md">
                     <Image
-                      src={currency.flagSrc || "/placeholder.svg"}
+                      src={currency.flagSrc || `/images/flags/${mapCurrencyToFlag(currency.code)}`}
                       alt={currency.country}
                       width={48}
                       height={48}
@@ -308,6 +446,7 @@ export default function RefundPage() {
                 </svg>
               </div>
               <p className="text-gray-500">환불 가능한 통화가 없습니다.</p>
+              <p className="text-sm text-gray-400 mt-2">먼저 충전을 통해 지갑을 생성해주세요.</p>
             </div>
           )}
         </div>
@@ -319,7 +458,7 @@ export default function RefundPage() {
   const renderAmountInput = () => (
     <div className="flex flex-col h-full">
       <header className="flex items-center justify-between p-4 border-b border-gray-200 bg-white shadow-sm">
-        <button onClick={() => (preselectedCurrency ? router.back() : setStep(0))} className="text-gray-700">
+        <button onClick={() => (preselectedCurrency ? router.back() : setStep(0))} className="text-gray-700 cursor-pointer">
           <ChevronLeft size={24} />
         </button>
         <h1 className="text-lg font-medium">환불하기</h1>
@@ -333,7 +472,7 @@ export default function RefundPage() {
               <div className="flex items-center mb-4">
                 <div className="relative h-10 w-10 overflow-hidden rounded-full mr-3 border border-gray-100 shadow-sm">
                   <Image
-                    src={selectedCurrency.flagSrc || "/placeholder.svg"}
+                    src={selectedCurrency.flagSrc || `/images/flags/${mapCurrencyToFlag(selectedCurrency.code)}`}
                     alt={selectedCurrency.country}
                     width={40}
                     height={40}
@@ -392,7 +531,7 @@ export default function RefundPage() {
                   <div className="flex items-center">
                     <div className="w-10 h-10 rounded-full flex items-center justify-center mr-3 overflow-hidden bg-white border border-gray-100">
                       <Image
-                        src={selectedAccount.logoSrc || "/placeholder.svg"}
+                        src={selectedAccount.bankLogo || `/images/flags/${mapCurrencyToFlag(selectedAccount.currency)}`}
                         alt={selectedAccount.bankName}
                         width={40}
                         height={40}
@@ -472,7 +611,7 @@ export default function RefundPage() {
   const renderPinInput = () => (
     <div className="flex flex-col h-full">
       <header className="flex items-center justify-between p-4 border-b border-gray-200 bg-white">
-        <button onClick={() => setStep(1)} className="text-gray-700">
+        <button onClick={() => setStep(1)} className="text-gray-700 cursor-pointer">
           <ChevronLeft size={24} />
         </button>
         <h1 className="text-lg font-medium">암호 입력</h1>
@@ -600,6 +739,11 @@ export default function RefundPage() {
                   ? `${getCurrencySymbol(selectedCurrency.code)}${Number.parseInt(amount, 10).toLocaleString()}`
                   : ""}
               </p>
+              {transactionId && (
+                <p className="text-sm text-gray-500 mt-2">
+                  거래번호: {transactionId}
+                </p>
+              )}
 
               <button
                 onClick={() => router.push("/home")}
@@ -662,10 +806,10 @@ export default function RefundPage() {
                 >
                   <div className="w-12 h-12 rounded-full flex items-center justify-center mr-3 overflow-hidden bg-white border border-gray-100 shadow-sm">
                     <Image
-                      src={account.logoSrc || "/placeholder.svg"}
+                      src={account.bankLogo || `/images/flags/${mapCurrencyToFlag(account.currency)}`}
                       alt={account.bankName}
-                      width={48}
-                      height={48}
+                      width={40}
+                      height={40}
                       className="object-contain"
                     />
                   </div>
