@@ -7,12 +7,15 @@ import { ChevronLeft, X, AlertCircle, Delete, ChevronDown } from "lucide-react"
 import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
 import ModalPortal from "@/components/modal-portal"
+import { getValidToken } from "@/lib/auth"
+import { mapCurrencyToFlag } from "@/lib/utils"
 
 type CurrencyInfo = {
   code: string
   country: string
   flagSrc: string
   amount: number
+  walletNumber: string
 }
 
 type RecipientInfo = {
@@ -20,6 +23,32 @@ type RecipientInfo = {
   walletNumber: string
   currencyCode: string
 }
+
+type PointTransferRequestDto = {
+  fromWalletNumber: string;
+  toWalletNumber: string;
+  amount: number;
+}
+
+type WalletResponse = {
+  currencyCode: string;
+  currencyName: string;
+  balance: number;
+  walletNumber: string;
+}
+
+const getCountryName = (code: string): string => {
+  const countryMap: Record<string, string> = {
+    KRW: "대한민국",
+    USD: "미국",
+    EUR: "유럽",
+    JPY: "일본",
+    CNY: "중국",
+    INR: "인도",
+    VND: "베트남",
+  };
+  return countryMap[code] || "알수없음";
+};
 
 export default function TransferPage() {
   const router = useRouter()
@@ -32,7 +61,6 @@ export default function TransferPage() {
   // States for multi-step form
   const [step, setStep] = useState<number>(skipFirstStep ? 1 : 0)
   const [walletNumber, setWalletNumber] = useState<string>(walletNumberParam || "")
-  const [memo, setMemo] = useState<string>("")
   const [selectedCurrency, setSelectedCurrency] = useState<CurrencyInfo | null>(null)
   const [amount, setAmount] = useState<string>("")
   const [pin, setPin] = useState<string>("")
@@ -46,31 +74,62 @@ export default function TransferPage() {
 
   // Load wallet balances and set initial data
   useEffect(() => {
-    const storedBalances = localStorage.getItem("walletBalances")
-    let parsedBalances: CurrencyInfo[] = []
+    const fetchWallets = async () => {
+      try {
+        const token = await getValidToken();
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/wallet/all`, {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          credentials: "include",
+        });
 
-    if (storedBalances) {
-      parsedBalances = JSON.parse(storedBalances)
-      setWalletBalances(parsedBalances)
-    }
+        if (!response.ok) {
+          throw new Error('Failed to fetch wallets');
+        }
 
-    // If currency is preselected, set it
-    if (preselectedCurrency && parsedBalances.length > 0) {
-      const currency = parsedBalances.find((c: CurrencyInfo) => c.code === preselectedCurrency)
-      if (currency) {
-        setSelectedCurrency(currency)
+        const result = await response.json();
+        if (!result.result) {
+          throw new Error('Invalid response format');
+        }
+
+        const walletInfos: CurrencyInfo[] = result.result.map((wallet: WalletResponse) => ({
+          country: getCountryName(wallet.currencyCode),
+          code: wallet.currencyCode,
+          flagSrc: `/images/flags/${mapCurrencyToFlag(wallet.currencyCode)}`,
+          amount: Number(wallet.balance),
+          walletNumber: wallet.walletNumber // 실제 지갑번호로 수정
+        }));
+
+        setWalletBalances(walletInfos);
+
+        // If currency is preselected, set it
+        if (preselectedCurrency && walletInfos.length > 0) {
+          const currency = walletInfos.find((c) => c.code === preselectedCurrency);
+          if (currency) {
+            setSelectedCurrency(currency);
+          }
+        }
+
+        // If recipient info is provided via URL params, set it
+        if (skipFirstStep && walletNumberParam && recipientNameParam && preselectedCurrency) {
+          setRecipientInfo({
+            name: recipientNameParam,
+            walletNumber: walletNumberParam,
+            currencyCode: preselectedCurrency,
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching wallets:', error);
+        if (error instanceof Error && error.message === "No token found") {
+          router.push("/login");
+        }
       }
-    }
+    };
 
-    // If recipient info is provided via URL params, set it
-    if (skipFirstStep && walletNumberParam && recipientNameParam && preselectedCurrency) {
-      setRecipientInfo({
-        name: recipientNameParam,
-        walletNumber: walletNumberParam,
-        currencyCode: preselectedCurrency,
-      })
-    }
-  }, [preselectedCurrency, walletNumberParam, recipientNameParam, skipFirstStep])
+    fetchWallets();
+  }, [preselectedCurrency, walletNumberParam, recipientNameParam, skipFirstStep]);
 
   // Validate amount whenever it changes
   useEffect(() => {
@@ -120,11 +179,6 @@ export default function TransferPage() {
     setWalletError("")
   }
 
-  // Handle memo input
-  const handleMemoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setMemo(e.target.value)
-  }
-
   // Handle amount input
   const handleAmountInput = (value: string) => {
     if (value === "backspace") {
@@ -155,82 +209,122 @@ export default function TransferPage() {
 
   // Mock API call to get recipient info
   const fetchRecipientInfo = async () => {
-    setIsLoading(true)
-    setWalletError("")
+    setIsLoading(true);
+    setWalletError("");
 
     try {
-      // In a real app, this would be an API call
-      // For demo purposes, we'll simulate an API response
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const token = await getValidToken();
+      // GET 방식, 쿼리스트링에 walletNumber, currencyCode 전달
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/wallet/search?walletNumber=${encodeURIComponent(walletNumber)}&currencyCode=${encodeURIComponent(selectedCurrency?.code ?? "")}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          credentials: "include",
+        }
+      );
 
-      // Check if wallet number is valid format
-      if (!walletNumber.match(/^\d{4}-\d{4}-\d{4}-\d{4}$/)) {
-        setWalletError("유효한 지갑 번호 형식이 아닙니다. (예: 9791-1924-6963-4618)")
-        setIsLoading(false)
-        return false
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        if (response.status === 404) {
+          setWalletError("존재하지 않는 지갑 번호입니다.");
+          setIsLoading(false);
+          return false;
+        }
+        if (response.status === 401 || response.status === 403) {
+          setWalletError("로그인이 필요합니다. 다시 로그인 해주세요.");
+          setIsLoading(false);
+          router.push("/login");
+          return false;
+        }
+        setWalletError(errorData.message || '수신자 정보 조회 중 오류가 발생했습니다.');
+        setIsLoading(false);
+        return false;
       }
 
-      // 실명 표시를 위해 고정된 이름 사용
-      const recipientName = recipientNameParam || "홍길동"
+      const result = await response.json();
+      if (!result.result) {
+        throw new Error('Invalid response format');
+      }
 
-      // Simulate API response
-      const mockResponse = {
-        name: recipientName,
+      setRecipientInfo({
+        name: result.result.userName,
         walletNumber: walletNumber,
-        currencyCode: selectedCurrency?.code || "KRW",
-      }
+        currencyCode: result.result.currencyCode,
+      });
 
-      setRecipientInfo(mockResponse)
-      setIsLoading(false)
-      return true
+      setIsLoading(false);
+      return true;
     } catch (error) {
-      console.error("Error fetching recipient info:", error)
-      setWalletError("지갑 정보를 조회하는 중 오류가 발생했습니다.")
-      setIsLoading(false)
-      return false
+      console.error("Error fetching recipient info:", error);
+      setWalletError("지갑 정보를 조회하는 중 오류가 발생했습니다.");
+      setIsLoading(false);
+      return false;
     }
-  }
+  };
 
   // Handle next step in transfer process
   const handleNext = async () => {
     if (step === 0) {
       // Validate wallet number and fetch recipient info
-      const isValid = await fetchRecipientInfo()
+      const isValid = await fetchRecipientInfo();
       if (isValid) {
-        setStep(1)
+        setStep(1);
       }
     } else if (step === 1 && amount && validateAmount()) {
-      setStep(2)
+      setStep(2);
     } else if (step === 2) {
-      setStep(3) // 확인 화면에서 PIN 입력 화면으로 이동
+      setStep(3); // 확인 화면에서 PIN 입력 화면으로 이동
     } else if (step === 3 && pin.length === 6) {
-      // Show success modal
-      setShowSuccessModal(true)
+      try {
+        const token = await getValidToken();
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/transfers/points`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            fromWalletNumber: selectedCurrency?.walletNumber,
+            toWalletNumber: recipientInfo?.walletNumber,
+            amount: Number(amount),
+          } as PointTransferRequestDto),
+        });
 
-      // After 5 minutes, redirect to home
-      setTimeout(() => {
-        // Update wallet balance
-        if (selectedCurrency) {
-          const walletBalances = JSON.parse(localStorage.getItem("walletBalances") || "[]")
-          const existingWalletIndex = walletBalances.findIndex((wallet: any) => wallet.code === selectedCurrency.code)
-
-          if (existingWalletIndex >= 0) {
-            // Update existing wallet
-            walletBalances[existingWalletIndex].amount -= Number.parseInt(amount)
-
-            // If balance becomes 0, consider removing the wallet
-            if (walletBalances[existingWalletIndex].amount <= 0) {
-              walletBalances.splice(existingWalletIndex, 1)
-            }
-          }
-
-          localStorage.setItem("walletBalances", JSON.stringify(walletBalances))
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || "송금 처리 중 오류가 발생했습니다.");
         }
 
-        router.push("/home")
-      }, 300000) // 5분(300,000ms)으로 변경
+        const result = await response.json();
+        if (!result.result) {
+          throw new Error("Invalid response format");
+        }
+
+        // Show success modal
+        setShowSuccessModal(true);
+
+        // After 2 seconds, redirect to home
+        setTimeout(() => {
+          router.push("/home");
+        }, 2000);
+
+        console.log('Transfer API params:', { fromWalletNumber: selectedCurrency?.walletNumber, toWalletNumber: recipientInfo?.walletNumber, amount: Number(amount) });
+      } catch (error) {
+        console.error("Error processing transfer:", error);
+        if (error instanceof Error && error.message === "No token found") {
+          router.push("/login");
+        } else {
+          // Show error message to user
+          alert(error instanceof Error ? error.message : "송금 처리 중 오류가 발생했습니다.");
+        }
+      }
     }
-  }
+  };
 
   // Format currency for display
   const formatCurrency = (value: string, code: string) => {
@@ -257,7 +351,7 @@ export default function TransferPage() {
   const renderRecipientInput = () => (
     <>
       <header className="flex items-center justify-between p-4 border-b border-gray-200 bg-white shadow-sm">
-        <button onClick={() => router.back()} className="text-gray-700">
+        <button onClick={() => router.back()} className="text-gray-700 cursor-pointer">
           <ChevronLeft size={24} />
         </button>
         <h1 className="text-lg font-medium">송금하기</h1>
@@ -296,14 +390,14 @@ export default function TransferPage() {
             )}
           </div>
           <div
-            className="flex items-center justify-between p-3 border-b border-gray-300"
+            className="flex items-center justify-between p-3 border-b border-gray-300 cursor-pointer"
             onClick={() => setShowCurrencyModal(true)}
           >
             {selectedCurrency ? (
               <div className="flex items-center">
                 <div className="relative h-6 w-6 overflow-hidden rounded-full mr-2">
                   <Image
-                    src={selectedCurrency.flagSrc || "/placeholder.svg"}
+                    src={selectedCurrency.flagSrc || "/images/flags/korea.png"}
                     alt={selectedCurrency.country}
                     width={24}
                     height={24}
@@ -340,8 +434,8 @@ export default function TransferPage() {
           disabled={!walletNumber || !selectedCurrency || isLoading}
           className={`w-full py-4 rounded-full text-center text-white font-medium text-lg ${
             walletNumber && selectedCurrency && !isLoading
-              ? "bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)]"
-              : "bg-gray-300"
+              ? "bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)] cursor-pointer"
+              : "bg-gray-300 cursor-not-allowed"
           }`}
         >
           {isLoading ? "조회 중..." : "다음"}
@@ -362,7 +456,7 @@ export default function TransferPage() {
               setStep(0)
             }
           }}
-          className="text-gray-700"
+          className="text-gray-700 cursor-pointer"
         >
           <ChevronLeft size={24} />
         </button>
@@ -377,7 +471,7 @@ export default function TransferPage() {
             <div className="flex items-center mb-4">
               <div className="relative h-6 w-6 overflow-hidden rounded-full mr-2">
                 <Image
-                  src={selectedCurrency.flagSrc || "/placeholder.svg"}
+                  src={selectedCurrency.flagSrc || "/images/flags/korea.png"}
                   alt={selectedCurrency.country}
                   width={24}
                   height={24}
@@ -433,7 +527,7 @@ export default function TransferPage() {
             <button
               key={item.key}
               onClick={() => handleAmountInput(item.key)}
-              className="py-5 text-center text-xl font-medium border-t border-r border-gray-200 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+              className="py-5 text-center text-xl font-medium border-t border-r border-gray-200 hover:bg-gray-50 active:bg-gray-100 transition-colors cursor-pointer"
             >
               {item.label}
             </button>
@@ -447,8 +541,8 @@ export default function TransferPage() {
             disabled={!amount || !!amountError}
             className={`w-full py-4 rounded-full text-center text-white font-medium text-lg ${
               amount && !amountError
-                ? "bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)]"
-                : "bg-gray-300"
+                ? "bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)] cursor-pointer"
+                : "bg-gray-300 cursor-not-allowed"
             }`}
           >
             다음
@@ -462,7 +556,7 @@ export default function TransferPage() {
   const renderConfirmation = () => (
     <>
       <header className="flex items-center justify-between p-4 border-b border-gray-200 bg-white shadow-sm">
-        <button onClick={() => setStep(1)} className="text-gray-700">
+        <button onClick={() => setStep(1)} className="text-gray-700 cursor-pointer">
           <ChevronLeft size={24} />
         </button>
         <h1 className="text-lg font-medium">송금하기</h1>
@@ -516,7 +610,7 @@ export default function TransferPage() {
       <div className="p-4 mt-auto">
         <button
           onClick={handleNext}
-          className="w-full py-4 rounded-full text-center text-white font-medium text-lg bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)]"
+          className="w-full py-4 rounded-full text-center text-white font-medium text-lg bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)] cursor-pointer"
         >
           보내기
         </button>
@@ -528,7 +622,7 @@ export default function TransferPage() {
   const renderPinInput = () => (
     <>
       <header className="flex items-center justify-between p-4 border-b border-gray-200 bg-white">
-        <button onClick={() => setStep(2)} className="text-gray-700">
+        <button onClick={() => setStep(2)} className="text-gray-700 cursor-pointer">
           <ChevronLeft size={24} />
         </button>
         <h1 className="text-lg font-medium">암호 입력</h1>
@@ -574,7 +668,7 @@ export default function TransferPage() {
                   <button
                     key={index}
                     type="button"
-                    className="flex h-14 w-full items-center justify-center rounded-full text-gray-600"
+                    className="flex h-14 w-full items-center justify-center rounded-full text-gray-600 hover:bg-gray-100 cursor-pointer"
                     onClick={() => handlePinInput("backspace")}
                   >
                     <Delete size={24} />
@@ -599,7 +693,7 @@ export default function TransferPage() {
         <div className="p-4">
           <button
             onClick={handleNext}
-            className="h-[60px] w-full rounded-[30px] bg-[#0DAEFF] text-center text-lg font-medium text-white shadow-[7px_7px_10px_0px_#D9D9D9] transition-all hover:bg-[#0A9EE8]"
+            className="h-[60px] w-full rounded-[30px] bg-[#0DAEFF] text-center text-lg font-medium text-white shadow-[7px_7px_10px_0px_#D9D9D9] transition-all hover:bg-[#0A9EE8] cursor-pointer"
           >
             확인
           </button>
@@ -684,7 +778,7 @@ export default function TransferPage() {
 
               <button
                 onClick={() => router.push("/home")}
-                className="w-full py-4 bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] text-white font-medium rounded-full text-lg"
+                className="w-full py-4 bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] text-white font-medium rounded-full text-lg cursor-pointer"
               >
                 확인
               </button>
@@ -746,7 +840,7 @@ export default function TransferPage() {
                 >
                   <div className="relative h-10 w-10 overflow-hidden rounded-full mr-3 border border-gray-100">
                     <Image
-                      src={currency.flagSrc || "/placeholder.svg"}
+                      src={currency.flagSrc || "/images/flags/korea.png"}
                       alt={currency.country}
                       width={40}
                       height={40}
