@@ -3,25 +3,101 @@
 import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { ChevronRight, MoreHorizontal, TrendingUp, TrendingDown } from "lucide-react"
+import { ChevronRight, TrendingUp, TrendingDown, MoreHorizontal } from "lucide-react"
 import { useRouter, usePathname } from "next/navigation"
+import { getValidToken } from "@/lib/auth"
 
-type WalletBalance = {
-  country: string
-  code: string
-  flagSrc: string
-  amount: number
+// 타입 정의
+interface WalletResponse {
+  currencyCode: string;
+  currencyName: string;
+  balance: number;
+  walletNumber: string;
 }
 
-type ExchangeRate = {
-  country: string
-  code: string
-  flagSrc: string
-  rate: string
-  change: string
-  percentage: string
-  isPositive: boolean
+interface WalletBalance {
+  country: string;
+  code: string;
+  flagSrc: string;
+  amount: number;
+  walletNumber: string;
 }
+
+interface ExchangeRate {
+  country: string;
+  code: string;
+  flagSrc: string;
+  rate: string;
+  change: string;
+  percentage: string;
+  isPositive: boolean;
+}
+
+const mapCurrencyToFlag = (code: string) => {
+  const map: Record<string, string> = {
+    KRW: "korea.png",
+    USD: "usa.png",
+    EUR: "eu.png",
+    JPY: "japan.png",
+    CNY: "china.png",
+    INR: "india.png",
+    VND: "vietnam.png",
+  }
+  return map[code] || "korea.png"
+}
+
+const mapCurrencyToCountry = (code: string) => {
+  const map: Record<string, string> = {
+    KRW: "대한민국",
+    USD: "미국",
+    EUR: "유럽",
+    JPY: "일본",
+    CNY: "중국",
+    INR: "인도",
+    VND: "베트남",
+  }
+  return map[code] || "알수없음"
+}
+
+const fetchWalletBalances = async (router: ReturnType<typeof useRouter>): Promise<WalletBalance[]> => {
+  try {
+    const token = await getValidToken();
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/wallet/all`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+    })
+
+    if (res.status === 401) {
+      router.push("/")
+      return []
+    }
+
+    const result = await res.json()
+    console.log('Wallet API result:', result);
+
+    if (!Array.isArray(result.result)) {
+      // 지갑이 없거나 응답이 비정상이어도 홈화면은 보여줌
+      return [];
+    }
+
+    const walletInfos: WalletBalance[] = result.result.map((wallet: WalletResponse) => ({
+      country: mapCurrencyToCountry(wallet.currencyCode),
+      code: wallet.currencyCode,
+      flagSrc: `/images/flags/${mapCurrencyToFlag(wallet.currencyCode)}`,
+      amount: Number(wallet.balance),
+      walletNumber: wallet.walletNumber
+    }));
+    return walletInfos;
+  } catch {
+    // 에러가 나도 홈화면은 보여줌
+    return [];
+  }
+}
+
 
 export default function HomePage() {
   const router = useRouter()
@@ -32,52 +108,25 @@ export default function HomePage() {
   const carouselRef = useRef<HTMLDivElement>(null)
   const [isScrolling, setIsScrolling] = useState(false)
   const [activeCardIndex, setActiveCardIndex] = useState(0)
-  const [accounts, setAccounts] = useState<
-    Array<{
-      bankName: string
-      accountNumber: string
-      logoSrc: string
-      currency: string
-    }>
-  >([])
+  const [showNoWalletModal, setShowNoWalletModal] = useState(false)
 
   useEffect(() => {
-    // Check if user is logged in
-    const isLoggedIn = localStorage.getItem("isLoggedIn")
-    if (!isLoggedIn) {
-      router.push("/")
-      return
+    const checkAuth = async () => {
+      try {
+        await getValidToken();
+        fetchWalletBalances(router).then((balances) => {
+          setWalletBalances(balances)
+          setHasWallet(balances.length > 0)
+          localStorage.setItem("walletBalances", JSON.stringify(balances))
+          localStorage.setItem("hasChargedWallet", balances.length > 0 ? "true" : "false")
+        })
+      } catch {
+        router.push("/")
+      }
     }
 
-    // Check if wallet has been charged before
-    const hasChargedWallet = localStorage.getItem("hasChargedWallet")
-    setHasWallet(hasChargedWallet === "true")
+    checkAuth();
 
-    // Load wallet balances from localStorage
-    const storedBalances = localStorage.getItem("walletBalances")
-    if (storedBalances) {
-      const parsedBalances = JSON.parse(storedBalances)
-      setWalletBalances(parsedBalances)
-    } else if (hasChargedWallet === "true") {
-      // Fallback to default balances if none are stored
-      const defaultBalances = [
-        { country: "대한민국", code: "KRW", flagSrc: "/images/flags/korea.png", amount: 10000 },
-        { country: "중국", code: "CNY", flagSrc: "/images/flags/china.png", amount: 50 },
-        { country: "인도", code: "INR", flagSrc: "/images/flags/india.png", amount: 800 },
-        { country: "일본", code: "JPY", flagSrc: "/images/flags/japan.png", amount: 1000 },
-        { country: "유럽", code: "EUR", flagSrc: "/images/flags/eu.png", amount: 10 },
-      ]
-      setWalletBalances(defaultBalances)
-      localStorage.setItem("walletBalances", JSON.stringify(defaultBalances))
-    }
-
-    // Load bank accounts
-    const storedAccounts = localStorage.getItem("bankAccounts")
-    if (storedAccounts) {
-      setAccounts(JSON.parse(storedAccounts))
-    }
-
-    // Set exchange rate data
     setExchangeRates([
       {
         country: "일본",
@@ -135,19 +184,17 @@ export default function HomePage() {
       },
     ])
 
-    // Set up auto-scrolling for the carousel
     const interval = setInterval(() => {
       if (carouselRef.current && !isScrolling) {
         carouselRef.current.scrollLeft += 1
-
-        // Update active card index
         if (carouselRef.current.scrollLeft % 150 === 0) {
           const newIndex = Math.floor(carouselRef.current.scrollLeft / 150) % exchangeRates.length
           setActiveCardIndex(newIndex)
         }
-
-        // Reset to beginning when reaching the end
-        if (carouselRef.current.scrollLeft >= carouselRef.current.scrollWidth - carouselRef.current.clientWidth - 10) {
+        if (
+          carouselRef.current.scrollLeft >=
+          carouselRef.current.scrollWidth - carouselRef.current.clientWidth - 10
+        ) {
           carouselRef.current.scrollLeft = 0
           setActiveCardIndex(0)
         }
@@ -158,20 +205,31 @@ export default function HomePage() {
   }, [router, isScrolling, exchangeRates.length])
 
   const handleCharge = () => {
-    // Navigate to charge page
     router.push("/wallet/charge")
   }
 
-  // Handle transfer button click
   const handleTransfer = () => {
-    // Navigate to transfer page
+    if (!hasWallet) {
+      setShowNoWalletModal(true)
+      return
+    }
     router.push("/wallet/transfer")
   }
 
-  // Handle refund button click
-  const handleRefund = () => {
-    // Navigate to refund page
-    router.push("/wallet/refund")
+  const handleSettlement = () => {
+    if (!hasWallet) {
+      setShowNoWalletModal(true)
+      return
+    }
+    router.push("/settlement")
+  }
+
+  const handlePayment = () => {
+    if (!hasWallet) {
+      setShowNoWalletModal(true)
+      return
+    }
+    router.push("/payment")
   }
 
   // 지갑 항목 클릭 핸들러
@@ -181,11 +239,11 @@ export default function HomePage() {
 
   // Navigation items with custom icons
   const navItems = [
-    { name: "홈", path: "/home", icon: "/images/icons/home-icon.png" },
-    { name: "정산", path: "/settlement", icon: "/images/icons/settlement-icon.png" },
-    { name: "환전", path: "/exchange", icon: "/images/icons/exchange-icon.png" },
-    { name: "결제", path: "/payment", icon: "/images/icons/payment-icon.png" },
-    { name: "더 보기", path: "/more", icon: "" }, // Using Lucide icon for this one
+    { name: "홈", path: "/home", icon: "/images/icons/home-icon.png", onClick: undefined },
+    { name: "정산", path: "/settlement", icon: "/images/icons/settlement-icon.png", onClick: handleSettlement },
+    { name: "환전", path: "/exchange", icon: "/images/icons/exchange-icon.png", onClick: undefined },
+    { name: "결제", path: "/payment", icon: "/images/icons/payment-icon.png", onClick: handlePayment },
+    { name: "더 보기", path: "/more", icon: "", onClick: undefined },
   ]
 
   return (
@@ -206,7 +264,7 @@ export default function HomePage() {
             <h2 className="text-lg font-medium text-gray-800">내 지갑</h2>
             <Link
               href="/wallet/history"
-              className="group rounded-full bg-gray-50 p-2 transition-all duration-300 hover:bg-blue-50"
+              className="group rounded-full bg-gray-50 p-2 transition-all duration-300 hover:bg-blue-500"
             >
               <ChevronRight className="h-5 w-5 text-gray-400 transition-all duration-300 group-hover:text-blue-500" />
             </Link>
@@ -214,38 +272,31 @@ export default function HomePage() {
 
           {hasWallet && walletBalances.length > 0 ? (
             <div className="mt-4 space-y-3">
-              {walletBalances.map((balance, index) => {
-                // 각 통화별로 고정된 지갑 번호 생성 (통화 코드 기반)
-                const walletNumber = `9791-${balance.code.charCodeAt(0)}${balance.code.charCodeAt(1)}-${
-                  balance.code.length > 2 ? balance.code.charCodeAt(2) : "00"
-                }${index + 1000}-${4618 + index}`
-
-                return (
-                  <div
-                    key={index}
-                    className="group flex cursor-pointer items-center justify-between border-b border-gray-100 pb-3 transition-all duration-300 hover:translate-x-1"
-                    onClick={() => handleWalletClick(balance.code)}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className="relative h-10 w-10 overflow-hidden rounded-full border border-gray-100 shadow-sm transition-all duration-300 group-hover:shadow-md">
-                        <Image
-                          src={balance.flagSrc || "/placeholder.svg"}
-                          alt={balance.country}
-                          width={40}
-                          height={40}
-                        />
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium text-gray-500">
-                          {balance.country} {balance.code}
-                        </p>
-                        <p className="text-lg font-bold text-gray-800">{balance.amount.toLocaleString()}</p>
-                        <p className="text-xs text-gray-400">{walletNumber}</p>
-                      </div>
+              {walletBalances.map((balance, index) => (
+                <div
+                  key={index}
+                  className="group flex cursor-pointer items-center justify-between border-b border-gray-100 pb-3 transition-all duration-300 hover:translate-x-1"
+                  onClick={() => handleWalletClick(balance.code)}
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="relative h-10 w-10 overflow-hidden rounded-full border border-gray-100 shadow-sm transition-all duration-300 group-hover:shadow-md">
+                      <Image
+                        src={balance.flagSrc || "/images/flags/korea.png"}
+                        alt={balance.country}
+                        width={40}
+                        height={40}
+                      />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-gray-500">
+                        {balance.country} {balance.code}
+                      </p>
+                      <p className="text-lg font-bold text-gray-800">{balance.amount.toLocaleString()}</p>
+                      <p className="text-xs text-gray-400">{balance.walletNumber}</p>
                     </div>
                   </div>
-                )
-              })}
+                </div>
+              ))}
             </div>
           ) : (
             <div className="my-10 text-center text-gray-500">
@@ -257,14 +308,14 @@ export default function HomePage() {
           <div className="mt-5 flex space-x-4">
             <button
               onClick={handleTransfer}
-              className="group relative flex-1 overflow-hidden rounded-lg bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] py-4 text-center font-medium text-white shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)] transition-all duration-300 hover:shadow-[0_6px_10px_-1px_rgba(77,169,255,0.4),0_2px_6px_-2px_rgba(77,169,255,0.3)] active:translate-y-0.5 active:shadow-[0_2px_4px_-1px_rgba(77,169,255,0.3),0_1px_2px_-1px_rgba(77,169,255,0.2)]"
+              className={`group relative flex-1 overflow-hidden rounded-lg py-4 text-center font-medium text-white shadow-md transition-all duration-300 bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)] hover:shadow-[0_6px_10px_-1px_rgba(77,169,255,0.4),0_2px_6px_-2px_rgba(77,169,255,0.3)] active:translate-y-0.5 active:shadow-[0_2px_4px_-1px_rgba(77,169,255,0.3),0_1px_2px_-1px_rgba(77,169,255,0.2)] cursor-pointer`}
             >
               <span className="relative z-10">송금하기</span>
               <div className="absolute inset-0 -left-full h-full w-full translate-x-0 bg-white opacity-20 transition-transform duration-300 group-hover:translate-x-full"></div>
             </button>
             <button
               onClick={handleCharge}
-              className="group relative flex-1 overflow-hidden rounded-lg bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] py-4 text-center font-medium text-white shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)] transition-all duration-300 hover:shadow-[0_6px_10px_-1px_rgba(77,169,255,0.4),0_2px_6px_-2px_rgba(77,169,255,0.3)] active:translate-y-0.5 active:shadow-[0_2px_4px_-1px_rgba(77,169,255,0.3),0_1px_2px_-1px_rgba(77,169,255,0.2)]"
+              className={`group relative flex-1 overflow-hidden rounded-lg py-4 text-center font-medium text-white shadow-md transition-all duration-300 bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)] hover:shadow-[0_6px_10px_-1px_rgba(77,169,255,0.4),0_2px_6px_-2px_rgba(77,169,255,0.3)] active:translate-y-0.5 active:shadow-[0_2px_4px_-1px_rgba(77,169,255,0.3),0_1px_2px_-1px_rgba(77,169,255,0.2)] cursor-pointer`}
             >
               <span className="relative z-10">충전하기</span>
               <div className="absolute inset-0 -left-full h-full w-full translate-x-0 bg-white opacity-20 transition-transform duration-300 group-hover:translate-x-full"></div>
@@ -338,7 +389,7 @@ export default function HomePage() {
               >
                 <div className="mb-3 flex items-center space-x-2">
                   <div className="relative h-8 w-8 overflow-hidden rounded-full border border-gray-100 shadow-sm transition-all duration-300 group-hover:shadow-md">
-                    <Image src={rate.flagSrc || "/placeholder.svg"} alt={rate.country} width={32} height={32} />
+                    <Image src={rate.flagSrc || "/images/flags/korea.png"} alt={rate.country} width={32} height={32} />
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-800">{rate.country}</p>
@@ -371,16 +422,17 @@ export default function HomePage() {
             <Link
               key={index}
               href={item.path}
+              onClick={item.onClick}
               className={`group flex flex-1 flex-col items-center justify-center py-3 ${
                 pathname === item.path ? "text-[#0DAEFF]" : "text-gray-500"
-              }`}
+              } cursor-pointer`}
             >
               {item.name === "더 보기" ? (
                 <MoreHorizontal className="h-8 w-8" />
               ) : (
                 <div className="relative h-8 w-8">
                   <Image
-                    src={item.icon || "/placeholder.svg"}
+                    src={item.icon}
                     alt={item.name}
                     width={32}
                     height={32}
@@ -404,6 +456,31 @@ export default function HomePage() {
           ))}
         </div>
       </div>
+
+      {/* No Wallet Modal */}
+      {showNoWalletModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-md">
+          <div className="rounded-lg bg-white p-6 shadow-lg w-80 text-center">
+            <h2 className="mb-4 text-lg font-semibold">지갑이 필요합니다</h2>
+            <p className="mb-6 text-gray-600">해당 작업을 수행하려면 먼저 지갑을 생성해야합니다.<br />지갑을 생성하시겠습니까?</p>
+            <button
+              className="w-full rounded bg-blue-500 py-2 text-white font-semibold hover:bg-blue-600 transition"
+              onClick={() => {
+                setShowNoWalletModal(false)
+                router.push("/wallet/charge")
+              }}
+            >
+              지갑 생성하기
+            </button>
+            <button
+              className="mt-3 w-full rounded border border-gray-300 py-2 text-gray-700 hover:bg-gray-100 transition"
+              onClick={() => setShowNoWalletModal(false)}
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
