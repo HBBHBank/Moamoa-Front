@@ -7,13 +7,52 @@ import { ChevronLeft, Check } from "lucide-react"
 import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
 import ModalPortal from "@/components/modal-portal"
+import { getValidToken } from "@/lib/auth"
+
+type VerificationCodeRequestDto = {
+  externalBankAccountNumber: string;
+}
+
+type VerificationCodeResponseDto = {
+  status: number;
+  message: string;
+  data: {
+    transactionId: string;
+    status: string;
+    message: string;
+  };
+}
+
+type VerificationCheckRequestDto = {
+  transactionId: string;
+  inputCode: number;
+}
+
+type CreateWalletRequestDto = {
+  inputCode: number;
+}
+
+type CreateWalletResponseDto = {
+  id: number;
+  userName: string;
+  walletNumber: string;
+  currencyCode: string;
+  currencyName: string;
+  balance: number;
+  externalAccountNumber: string;
+}
+
+type FieldError = {
+  defaultMessage?: string;
+  message?: string;
+};
 
 export default function AccountRegistrationPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const returnUrl = searchParams.get("returnUrl") || "/wallet/charge"
   const currency = searchParams.get("currency") || "KRW"
   const chargeAmount = searchParams.get("amount") || "0"
+  const authorizationCode = searchParams.get("code") || ""
 
   const [step, setStep] = useState<number>(0)
   const [accountNumber, setAccountNumber] = useState<string>("")
@@ -65,35 +104,204 @@ export default function AccountRegistrationPage() {
 
   // Handle next step
   const handleNext = () => {
-    if (step === 0 && accountNumber && isAccountNumberComplete(accountNumber)) {
-      setStep(1)
-    } else if (step === 1 && depositorName.length === 3) {
-      // Show verification modal
-      setShowVerificationModal(true)
+    if (step === 0) {
+      if (!accountNumber || !isAccountNumberComplete(accountNumber)) {
+        alert('올바른 계좌번호를 입력해 주세요.');
+        return;
+      }
+      setStep(1);
+    } else if (step === 1) {
+      if (depositorName.length !== 3) {
+        alert('입금자명(숫자 3자리)을 입력해 주세요.');
+        return;
+      }
+      setShowVerificationModal(true);
     }
   }
 
   // Handle verification confirmation
-  const handleVerificationConfirm = () => {
-    // In a real app, this would verify the deposit with the bank
-    // For demo purposes, we'll just add the account and return to the charge page
+  const handleVerificationConfirm = async () => {
+    try {
+      const token = await getValidToken();
+      
+      // 1. 인증 코드 요청
+      const verificationRequest: VerificationCodeRequestDto = {
+        externalBankAccountNumber: accountNumber
+      };
+      console.log('Account Registration API params:', verificationRequest);
 
-    // Store the account in localStorage
-    const newAccount = {
-      bankName: "환비은행",
-      accountNumber: accountNumber,
-      logoSrc: "/images/hwanbi-bank-logo.png",
-      currency: currency,
+      const verificationResponse = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/wallet/verification-code?authorizationCode=${authorizationCode}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          credentials: "include",
+          body: JSON.stringify(verificationRequest)
+        }
+      );
+
+      if (!verificationResponse.ok) {
+        const errorData = await verificationResponse.json();
+        let errorMsg = '인증 코드 요청에 실패했습니다.';
+        
+        if (errorData.errorCode) {
+          switch (errorData.errorCode) {
+            case "HWANBEE_001": errorMsg = "인증 코드 요청에 실패했습니다."; break;
+            case "HWANBEE_002": errorMsg = "인증 코드 검증에 실패했습니다."; break;
+            case "HWANBEE_003": errorMsg = "계좌 정보가 올바르지 않거나 소유자가 일치하지 않습니다."; break;
+            case "HWANBEE_004": errorMsg = "계좌 인증에 실패했습니다."; break;
+            case "HWANBEE_005": errorMsg = "계좌 연결 중 오류가 발생했습니다."; break;
+            case "HWANBEE_006": errorMsg = "환비 토큰 발급에 실패했습니다."; break;
+            case "HWANBEE_007": errorMsg = "환비 송금 API 요청에 실패했습니다."; break;
+            case "HWANBEE_008": errorMsg = "환전 정보 조회에 실패했습니다."; break;
+            case "HWANBEE_009": errorMsg = "환전 진행에 실패했습니다."; break;
+            case "RCG_001": errorMsg = "외화는 직접 충전이 불가능합니다."; break;
+            case "RCG_002": errorMsg = "환율 정보를 불러오는 데 실패했습니다."; break;
+            case "RCG_003": errorMsg = "수수료 계산에 실패했습니다."; break;
+            case "RCG_004": errorMsg = "연결된 계좌 정보를 찾을 수 없습니다."; break;
+            case "RCG_005": errorMsg = "충전 금액이 유효하지 않습니다."; break;
+            case "RCG_006": errorMsg = "충전 금액은 만원 단위여야 합니다."; break;
+            default:
+              if (errorData.message) errorMsg = errorData.message;
+          }
+        } else if (errorData.errors && Array.isArray(errorData.errors)) {
+          errorMsg = errorData.errors.map((err: FieldError) => err.defaultMessage || err.message).join('\n');
+        }
+        
+        alert(errorMsg);
+        setShowVerificationModal(false);
+        return;
+      }
+
+      const verificationResult = await verificationResponse.json() as VerificationCodeResponseDto;
+      if (!verificationResult.data) {
+        throw new Error('Invalid response format');
+      }
+
+      // 2. 환비 API에 인증 코드 검증 요청
+      const verificationCheckRequest: VerificationCheckRequestDto = {
+        transactionId: verificationResult.data.transactionId,
+        inputCode: Number.parseInt(depositorName)
+      };
+
+      const verificationCheckResponse = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/wallet/verification-check`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          credentials: "include",
+          body: JSON.stringify(verificationCheckRequest)
+        }
+      );
+
+      if (!verificationCheckResponse.ok) {
+        const errorData = await verificationCheckResponse.json();
+        let errorMsg = '인증 코드 검증에 실패했습니다.';
+        
+        if (errorData.errorCode) {
+          switch (errorData.errorCode) {
+            case "HWANBEE_001": errorMsg = "인증 코드 요청에 실패했습니다."; break;
+            case "HWANBEE_002": errorMsg = "인증 코드 검증에 실패했습니다."; break;
+            case "HWANBEE_003": errorMsg = "계좌 정보가 올바르지 않거나 소유자가 일치하지 않습니다."; break;
+            case "HWANBEE_004": errorMsg = "계좌 인증에 실패했습니다."; break;
+            case "HWANBEE_005": errorMsg = "계좌 연결 중 오류가 발생했습니다."; break;
+            case "HWANBEE_006": errorMsg = "환비 토큰 발급에 실패했습니다."; break;
+            case "HWANBEE_007": errorMsg = "환비 송금 API 요청에 실패했습니다."; break;
+            case "HWANBEE_008": errorMsg = "환전 정보 조회에 실패했습니다."; break;
+            case "HWANBEE_009": errorMsg = "환전 진행에 실패했습니다."; break;
+            case "RCG_001": errorMsg = "외화는 직접 충전이 불가능합니다."; break;
+            case "RCG_002": errorMsg = "환율 정보를 불러오는 데 실패했습니다."; break;
+            case "RCG_003": errorMsg = "수수료 계산에 실패했습니다."; break;
+            case "RCG_004": errorMsg = "연결된 계좌 정보를 찾을 수 없습니다."; break;
+            case "RCG_005": errorMsg = "충전 금액이 유효하지 않습니다."; break;
+            case "RCG_006": errorMsg = "충전 금액은 만원 단위여야 합니다."; break;
+            default:
+              if (errorData.message) errorMsg = errorData.message;
+          }
+        } else if (errorData.errors && Array.isArray(errorData.errors)) {
+          errorMsg = errorData.errors.map((err: FieldError) => err.defaultMessage || err.message).join('\n');
+        }
+        
+        alert(errorMsg);
+        setShowVerificationModal(false);
+        return;
+      }
+
+      // 3. 지갑 생성
+      const createWalletRequest: CreateWalletRequestDto = {
+        inputCode: Number.parseInt(depositorName)
+      };
+
+      const createWalletResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/wallet`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+        body: JSON.stringify(createWalletRequest)
+      });
+
+      if (!createWalletResponse.ok) {
+        const errorData = await createWalletResponse.json();
+        let errorMsg = '계좌 인증에 실패했습니다.';
+        
+        if (errorData.errorCode) {
+          switch (errorData.errorCode) {
+            case "HWANBEE_001": errorMsg = "인증 코드 요청에 실패했습니다."; break;
+            case "HWANBEE_002": errorMsg = "인증 코드 검증에 실패했습니다."; break;
+            case "HWANBEE_003": errorMsg = "계좌 정보가 올바르지 않거나 소유자가 일치하지 않습니다."; break;
+            case "HWANBEE_004": errorMsg = "계좌 인증에 실패했습니다."; break;
+            case "HWANBEE_005": errorMsg = "계좌 연결 중 오류가 발생했습니다."; break;
+            case "HWANBEE_006": errorMsg = "환비 토큰 발급에 실패했습니다."; break;
+            case "HWANBEE_007": errorMsg = "환비 송금 API 요청에 실패했습니다."; break;
+            case "HWANBEE_008": errorMsg = "환전 정보 조회에 실패했습니다."; break;
+            case "HWANBEE_009": errorMsg = "환전 진행에 실패했습니다."; break;
+            case "RCG_001": errorMsg = "외화는 직접 충전이 불가능합니다."; break;
+            case "RCG_002": errorMsg = "환율 정보를 불러오는 데 실패했습니다."; break;
+            case "RCG_003": errorMsg = "수수료 계산에 실패했습니다."; break;
+            case "RCG_004": errorMsg = "연결된 계좌 정보를 찾을 수 없습니다."; break;
+            case "RCG_005": errorMsg = "충전 금액이 유효하지 않습니다."; break;
+            case "RCG_006": errorMsg = "충전 금액은 만원 단위여야 합니다."; break;
+            default:
+              if (errorData.message) errorMsg = errorData.message;
+          }
+        } else if (errorData.errors && Array.isArray(errorData.errors)) {
+          errorMsg = errorData.errors.map((err: FieldError) => err.defaultMessage || err.message).join('\n');
+        }
+        
+        alert(errorMsg);
+        setShowVerificationModal(false);
+        return;
+      }
+
+      const result = await createWalletResponse.json();
+      if (!result.data) {
+        throw new Error('Invalid response format');
+      }
+
+      const walletData = result.data as CreateWalletResponseDto;
+      
+      // 성공 메시지 표시
+      alert(`지갑이 성공적으로 생성되었습니다.\n지갑번호: ${walletData.walletNumber}`);
+
+      router.push(`/wallet/charge?currency=${currency}`);
+    } catch (error) {
+      console.error('Error registering account:', error);
+      if (error instanceof Error && error.message === "No token found") {
+        router.push("/login");
+      } else {
+        alert(error instanceof Error ? error.message : '계좌 등록 중 오류가 발생했습니다.');
+      }
+      setShowVerificationModal(false);
     }
-
-    const existingAccounts = localStorage.getItem("bankAccounts")
-    const accounts = existingAccounts ? JSON.parse(existingAccounts) : []
-    accounts.push(newAccount)
-    localStorage.setItem("bankAccounts", JSON.stringify(accounts))
-
-    // Redirect back to the charge page with the currency parameter
-    router.push(`/wallet/charge?currency=${currency}`)
-  }
+  };
 
   // Format currency for display
   const formatCurrency = (value: string, code: string) => {
@@ -257,7 +465,7 @@ export default function AccountRegistrationPage() {
         className="fixed inset-0 z-50"
         style={{
           backgroundColor: "rgba(0, 0, 0, 0.5)",
-          backdropFilter: "blur(2px)",
+          backdropFilter: "blur(4px)",
           animation: "fadeIn 0.3s ease-out",
         }}
         onClick={() => setShowVerificationModal(false)}
@@ -276,7 +484,7 @@ export default function AccountRegistrationPage() {
               <p className="text-xl font-medium mb-6">인증이 완료되었습니다.</p>
               <button
                 onClick={handleVerificationConfirm}
-                className="w-full py-4 bg-blue-500 text-white font-medium rounded-full text-lg"
+                className="w-full py-4 bg-blue-500 text-white font-medium rounded-full text-lg cursor-pointer"
               >
                 확인
               </button>
@@ -290,14 +498,14 @@ export default function AccountRegistrationPage() {
   return (
     <div className="flex flex-col min-h-screen bg-white">
       <header className="flex items-center justify-between p-4 border-b border-gray-200 bg-white">
-        <button onClick={() => router.back()} className="text-gray-700">
+        <button onClick={() => router.back()} className="text-gray-700 cursor-pointer">
           <ChevronLeft size={24} />
         </button>
         <h1 className="text-lg font-medium">계좌등록</h1>
         <div className="w-6"></div>
       </header>
 
-      {step === 0 ? renderAccountNumberInput() : renderVerificationStep()}
+      {step === 0 ? renderAccountNumberInput() : step === 1 ? renderVerificationStep() : renderVerificationModal()}
 
       {step === 0 && (
         <div className="p-4 mt-auto">
@@ -305,7 +513,7 @@ export default function AccountRegistrationPage() {
             onClick={handleNext}
             disabled={!accountNumber || !isAccountNumberComplete(accountNumber)}
             className={`w-full py-4 text-center text-white font-medium rounded-full text-lg ${
-              accountNumber && isAccountNumberComplete(accountNumber) ? "bg-blue-500" : "bg-gray-300"
+              accountNumber && isAccountNumberComplete(accountNumber) ? "bg-blue-500 cursor-pointer" : "bg-gray-300 cursor-not-allowed"
             }`}
           >
             다음

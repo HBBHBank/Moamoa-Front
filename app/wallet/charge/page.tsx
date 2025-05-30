@@ -5,6 +5,8 @@ import { ChevronLeft, X, ChevronDown, Check, Plus, AlertCircle, Delete } from "l
 import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
 import ModalPortal from "@/components/modal-portal"
+import { getValidToken } from "@/lib/auth"
+import { mapCurrencyToFlag } from "@/lib/utils"
 
 type CurrencyInfo = {
   code: string
@@ -13,11 +15,30 @@ type CurrencyInfo = {
   chargeUnit: number
 }
 
+type BankAccountResponseDto = {
+  id: number;
+  accountNumber: string;
+  currency: string;
+}
+
 type BankAccount = {
-  bankName: string
-  accountNumber: string
-  logoSrc: string
-  currency: string
+  id: number;
+  accountNumber: string;
+  bankName: string;
+  bankLogo: string;
+  currency: string;
+}
+
+type FieldError = {
+  defaultMessage?: string;
+  message?: string;
+};
+
+// 통화 포맷팅 유틸리티 함수
+const formatCurrency = (value: string | number, code: string): string => {
+  const numValue = typeof value === 'string' ? Number.parseInt(value, 10) : value
+  if (isNaN(numValue)) return `0 ${code}`
+  return `${numValue.toLocaleString()} ${code}`
 }
 
 export default function ChargePage() {
@@ -25,7 +46,6 @@ export default function ChargePage() {
   const searchParams = useSearchParams()
   const preselectedCurrency = searchParams.get("currency")
 
-  // States for multi-step form
   const [step, setStep] = useState<number>(preselectedCurrency ? 1 : 0)
   const [selectedCurrency, setSelectedCurrency] = useState<CurrencyInfo | null>(null)
   const [amount, setAmount] = useState<string>("")
@@ -37,8 +57,9 @@ export default function ChargePage() {
   const [selectedAccount, setSelectedAccount] = useState<BankAccount | null>(null)
   const [filteredAccounts, setFilteredAccounts] = useState<BankAccount[]>([])
   const [amountError, setAmountError] = useState<string>("")
+  const [isLoading, setIsLoading] = useState(false)
 
-  // Available currencies with charge units
+  // 통화 목록
   const currencies: CurrencyInfo[] = [
     { code: "VND", country: "베트남", flagSrc: "/images/flags/vietnam.png", chargeUnit: 200000 },
     { code: "JPY", country: "일본", flagSrc: "/images/flags/japan.png", chargeUnit: 1000 },
@@ -49,22 +70,56 @@ export default function ChargePage() {
     { code: "INR", country: "인도", flagSrc: "/images/flags/india.png", chargeUnit: 800 },
   ]
 
-  // Load accounts from localStorage on mount
-  useEffect(() => {
-    const storedAccounts = localStorage.getItem("bankAccounts")
-    if (storedAccounts) {
-      const parsedAccounts = JSON.parse(storedAccounts)
-      setAccounts(parsedAccounts)
-    }
-  }, [])
+  // Fetch bank accounts
+  const fetchBankAccounts = async () => {
+    try {
+      const token = await getValidToken();
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/wallet/bank-accounts`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+      });
 
-  // Set preselected currency if provided in URL
+      if (!response.ok) {
+        throw new Error('Failed to fetch bank accounts');
+      }
+
+      const result = await response.json();
+      if (!Array.isArray(result.result)) {
+        throw new Error('Invalid response format');
+      }
+
+      const bankAccounts: BankAccount[] = result.result.map((account: BankAccountResponseDto) => ({
+        id: account.id,
+        accountNumber: account.accountNumber,
+        bankName: "환비 은행",
+        bankLogo: "/images/hwanbi-bank-logo.png",
+        currency: account.currency,
+      }));
+
+      setAccounts(bankAccounts);
+    } catch (error) {
+      console.error('Error fetching bank accounts:', error);
+      if (error instanceof Error && error.message === "No token found") {
+        router.push("/login");
+      }
+    }
+  };
+
+  // Initialize bank accounts
   useEffect(() => {
-    if (preselectedCurrency) {
-      const currency = currencies.find((c) => c.code === preselectedCurrency)
-      if (currency) {
-        setSelectedCurrency(currency)
-        setStep(1) // Skip to amount input step when currency is preselected
+    fetchBankAccounts();
+  }, [router]);
+
+  // 사용자가 다른 페이지에서 특정 통화를 선택하고 이 페이지로 이동했을 때,
+  // 통화 선택 단계를 건너뛰고 바로 금액 입력 단계로 이동하게 함
+  useEffect(() => {
+    if (preselectedCurrency) {  // URL에 통화 파라미터가 있는 경우
+      const currency = currencies.find((c) => c.code === preselectedCurrency)  // 해당 통화 찾기
+      if (currency) {  // 통화를 찾았다면
+        setSelectedCurrency(currency)  // 선택된 통화 상태 업데이트
+        setStep(1)  // 금액 입력 단계로 바로 이동
       }
     }
   }, [preselectedCurrency])
@@ -72,20 +127,21 @@ export default function ChargePage() {
   // Filter accounts by selected currency
   useEffect(() => {
     if (selectedCurrency && accounts.length > 0) {
-      const filtered = accounts.filter((account) => account.currency === selectedCurrency.code)
-      setFilteredAccounts(filtered)
+      const filtered = accounts.filter(
+        (account) => account.currency.toUpperCase() === selectedCurrency.code.toUpperCase()
+      );
+      setFilteredAccounts(filtered);
 
-      // If there's only one account for this currency, select it automatically
       if (filtered.length === 1) {
-        setSelectedAccount(filtered[0])
+        setSelectedAccount(filtered[0]);
       } else {
-        setSelectedAccount(null)
+        setSelectedAccount(null);
       }
     } else {
-      setFilteredAccounts([])
-      setSelectedAccount(null)
+      setFilteredAccounts([]);
+      setSelectedAccount(null);
     }
-  }, [selectedCurrency, accounts])
+  }, [selectedCurrency, accounts]);
 
   // Validate amount whenever it changes
   useEffect(() => {
@@ -158,54 +214,157 @@ export default function ChargePage() {
   }
 
   // Handle next step in charge process
-  const handleNext = () => {
+  const handleNext = async () => {
+    if (isLoading) return;
     if (step === 1 && amount && selectedAccount && validateAmount()) {
       setStep(2)
-    } else if (step === 2 && pin.length === 6) {
-      // Show success modal
-      setShowSuccessModal(true)
+    } else if (step === 2 && pin.length === 6 && selectedAccount) {
+      // Defensive checks for required fields
+      if (!selectedAccount.accountNumber) {
+        alert('계좌번호가 없습니다.');
+        setIsLoading(false);
+        return;
+      }
+      if (!amount || isNaN(Number(amount))) {
+        alert('금액이 올바르지 않습니다.');
+        setIsLoading(false);
+        return;
+      }
+      if (!selectedCurrency?.code) {
+        alert('통화 코드가 없습니다.');
+        setIsLoading(false);
+        return;
+      }
+      if (!pin || pin.length !== 6) {
+        alert('암호(PIN)가 올바르지 않습니다.');
+        setIsLoading(false);
+        return;
+      }
+      setIsLoading(true);
+      try {
+        const params = {
+          walletNumber: selectedAccount.accountNumber,
+          hwanbeeAccountNumber: selectedAccount.accountNumber,
+          amount: Number.parseInt(amount),
+          password: pin
+        };
+        console.log('Charge API params:', params);
+        const token = await getValidToken();
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/recharge`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          credentials: "include",
+          body: JSON.stringify(params)
+        });
 
-      // After 2 seconds, redirect to home
-      setTimeout(() => {
-        // Update local storage to indicate wallet has been charged
-        localStorage.setItem("hasChargedWallet", "true")
-
-        // Add or update the wallet balance
-        const walletBalances = JSON.parse(localStorage.getItem("walletBalances") || "[]")
-        const existingWalletIndex = walletBalances.findIndex((wallet: any) => wallet.code === selectedCurrency?.code)
-
-        if (existingWalletIndex >= 0) {
-          // Update existing wallet
-          walletBalances[existingWalletIndex].amount += Number.parseInt(amount)
-        } else if (selectedCurrency) {
-          // Add new wallet
-          walletBalances.push({
-            country: selectedCurrency.country,
-            code: selectedCurrency.code,
-            flagSrc: selectedCurrency.flagSrc,
-            amount: Number.parseInt(amount),
-          })
+        if (!response.ok) {
+          const errorData = await response.json();
+          let errorMsg = '충전에 실패했습니다.';
+          if (errorData.errorCode) {
+            switch (errorData.errorCode) {
+              case "RCG_001": errorMsg = "외화는 직접 충전이 불가능합니다."; break;
+              case "RCG_002": errorMsg = "환율 정보를 불러오는 데 실패했습니다."; break;
+              case "RCG_003": errorMsg = "수수료 계산에 실패했습니다."; break;
+              case "RCG_004": errorMsg = "연결된 계좌 정보를 찾을 수 없습니다."; break;
+              case "RCG_005": errorMsg = "충전 금액이 유효하지 않습니다."; break;
+              case "RCG_006": errorMsg = "충전 금액은 만원 단위여야 합니다."; break;
+              default:
+                if (errorData.message) errorMsg = errorData.message;
+            }
+          }
+          if (errorData.errors && Array.isArray(errorData.errors)) {
+            errorMsg = errorData.errors.map((err: FieldError) => err.defaultMessage || err.message).join('\n');
+          }
+          alert(errorMsg);
+          setIsLoading(false);
+          return;
         }
 
-        localStorage.setItem("walletBalances", JSON.stringify(walletBalances))
-
-        router.push("/home")
-      }, 2000)
+        // 충전 성공 시 안내
+        setShowSuccessModal(true);
+        setTimeout(() => {
+          router.push("/home");
+        }, 2000);
+      } catch (error) {
+        console.error('Error charging wallet:', error);
+        if (error instanceof Error && error.message === "No token found") {
+          router.push("/login");
+        } else {
+          alert(error instanceof Error ? error.message : '충전 중 오류가 발생했습니다.');
+        }
+        setIsLoading(false);
+      }
     }
   }
 
   // Handle adding a new account
-  const handleAddAccount = () => {
-    if (!selectedCurrency) return
+  const handleAddAccount = async () => {
+    if (!selectedCurrency) return;
+    
+    try {
+      const token = await getValidToken();
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/wallet/verification-code`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          externalBankAccountNumber: selectedCurrency.code
+        })
+      });
 
-    // Navigate to account registration page with currency and amount (if available)
-    const amountParam = amount && !amountError ? `&amount=${amount}` : ""
-    router.push(
-      `/wallet/charge/account-registration?returnUrl=${encodeURIComponent("/wallet/charge")}&currency=${
-        selectedCurrency.code
-      }${amountParam}`,
-    )
-  }
+      if (!response.ok) {
+        const errorData = await response.json();
+        let errorMsg = '인증 코드 요청에 실패했습니다.';
+        
+        if (errorData.errorCode) {
+          switch (errorData.errorCode) {
+            case "HWANBEE_001": errorMsg = "인증 코드 요청에 실패했습니다."; break;
+            case "HWANBEE_002": errorMsg = "인증 코드 검증에 실패했습니다."; break;
+            case "HWANBEE_003": errorMsg = "계좌 정보가 올바르지 않거나 소유자가 일치하지 않습니다."; break;
+            case "HWANBEE_004": errorMsg = "계좌 인증에 실패했습니다."; break;
+            case "HWANBEE_005": errorMsg = "계좌 연결 중 오류가 발생했습니다."; break;
+            case "HWANBEE_006": errorMsg = "환비 토큰 발급에 실패했습니다."; break;
+            case "HWANBEE_007": errorMsg = "환비 송금 API 요청에 실패했습니다."; break;
+            case "HWANBEE_008": errorMsg = "환전 정보 조회에 실패했습니다."; break;
+            case "HWANBEE_009": errorMsg = "환전 진행에 실패했습니다."; break;
+            case "RCG_001": errorMsg = "외화는 직접 충전이 불가능합니다."; break;
+            case "RCG_002": errorMsg = "환율 정보를 불러오는 데 실패했습니다."; break;
+            case "RCG_003": errorMsg = "수수료 계산에 실패했습니다."; break;
+            case "RCG_004": errorMsg = "연결된 계좌 정보를 찾을 수 없습니다."; break;
+            case "RCG_005": errorMsg = "충전 금액이 유효하지 않습니다."; break;
+            case "RCG_006": errorMsg = "충전 금액은 만원 단위여야 합니다."; break;
+            default:
+              if (errorData.message) errorMsg = errorData.message;
+          }
+        } else if (errorData.errors && Array.isArray(errorData.errors)) {
+          errorMsg = errorData.errors.map((err: FieldError) => err.defaultMessage || err.message).join('\n');
+        }
+        
+        alert(errorMsg);
+        return;
+      }
+
+      const result = await response.json();
+      if (!result.data) {
+        throw new Error('Invalid response format');
+      }
+
+      router.push(`/wallet/charge/account-registration?currency=${selectedCurrency.code}&amount=${amount}`);
+    } catch (error) {
+      console.error('Error requesting verification code:', error);
+      if (error instanceof Error && error.message === "No token found") {
+        router.push("/login");
+      } else {
+        alert(error instanceof Error ? error.message : '인증 코드 요청 중 오류가 발생했습니다.');
+      }
+    }
+  };
 
   // Handle selecting an account
   const handleSelectAccount = (account: BankAccount) => {
@@ -213,18 +372,11 @@ export default function ChargePage() {
     setShowAccountModal(false)
   }
 
-  // Format currency for display
-  const formatCurrency = (value: string, code: string) => {
-    const numValue = Number.parseInt(value, 10)
-    if (isNaN(numValue)) return `0 ${code}`
-    return `${numValue.toLocaleString()} ${code}`
-  }
-
   // Render currency selection step
   const renderCurrencySelection = () => (
     <div className="flex flex-col h-full">
       <header className="flex items-center justify-between p-4 border-b border-gray-200 bg-white shadow-sm">
-        <button onClick={() => router.back()} className="text-gray-700">
+        <button onClick={() => router.back()} className="text-gray-700 cursor-pointer">
           <ChevronLeft size={24} />
         </button>
         <h1 className="text-lg font-medium">통화 선택</h1>
@@ -265,16 +417,17 @@ export default function ChargePage() {
             {filteredCurrencies.map((currency) => (
               <button
                 key={currency.code}
-                className="flex items-center w-full py-3 px-4 rounded-xl hover:bg-gray-50 transition-all duration-300 border border-transparent hover:border-gray-200"
+                className="flex items-center w-full py-3 px-4 rounded-xl hover:bg-gray-50 transition-all duration-300 border border-transparent hover:border-gray-200 cursor-pointer"
                 onClick={() => handleSelectCurrency(currency)}
               >
                 <div className="relative h-12 w-12 overflow-hidden rounded-full mr-4 border border-gray-100 shadow-sm transition-all duration-300 hover:shadow-md">
                   <Image
-                    src={currency.flagSrc || "/placeholder.svg"}
+                    src={currency.flagSrc || `/images/flags/${mapCurrencyToFlag(currency.code)}`}
                     alt={currency.country}
                     width={48}
                     height={48}
                     className="object-cover"
+                    priority
                   />
                 </div>
                 <div className="flex flex-col items-start">
@@ -297,7 +450,7 @@ export default function ChargePage() {
   const renderAmountInput = () => (
     <div className="flex flex-col h-full">
       <header className="flex items-center justify-between p-4 border-b border-gray-200 bg-white shadow-sm">
-        <button onClick={() => (preselectedCurrency ? router.back() : setStep(0))} className="text-gray-700">
+        <button onClick={() => (preselectedCurrency ? router.back() : setStep(0))} className="text-gray-700 cursor-pointer">
           <ChevronLeft size={24} />
         </button>
         <h1 className="text-lg font-medium">충전하기</h1>
@@ -311,11 +464,12 @@ export default function ChargePage() {
               <div className="flex items-center mb-4">
                 <div className="relative h-10 w-10 overflow-hidden rounded-full mr-3 border border-gray-100 shadow-sm">
                   <Image
-                    src={selectedCurrency.flagSrc || "/placeholder.svg"}
+                    src={selectedCurrency.flagSrc || `/images/flags/${mapCurrencyToFlag(selectedCurrency.code)}`}
                     alt={selectedCurrency.country}
                     width={40}
                     height={40}
                     className="object-cover"
+                    priority
                   />
                 </div>
                 <div>
@@ -352,22 +506,23 @@ export default function ChargePage() {
             <h3 className="text-sm font-medium text-gray-600 mb-2">출금 계좌 선택</h3>
             <button
               onClick={() => setShowAccountModal(true)}
-              className="flex items-center justify-between w-full border border-gray-200 rounded-xl p-4 bg-white hover:bg-gray-50 transition-colors shadow-sm hover:shadow-md"
+              className="flex items-center justify-between w-full border border-gray-200 rounded-xl p-4 bg-white hover:bg-gray-50 transition-colors shadow-sm hover:shadow-md cursor-pointer"
             >
               {selectedAccount ? (
                 <>
                   <div className="flex items-center">
                     <div className="w-10 h-10 rounded-full flex items-center justify-center mr-3 overflow-hidden bg-white border border-gray-100">
                       <Image
-                        src={selectedAccount.logoSrc || "/placeholder.svg"}
-                        alt={selectedAccount.bankName}
+                        src="/images/hwanbi-bank-logo.png"
+                        alt="환비 은행"
                         width={40}
                         height={40}
                         className="object-contain"
+                        priority
                       />
                     </div>
                     <div className="flex flex-col items-start">
-                      <div className="font-medium text-gray-800">{selectedAccount.bankName}</div>
+                      <div className="font-medium text-gray-800">환비 은행</div>
                       <div className="text-gray-500 text-sm">{selectedAccount.accountNumber}</div>
                     </div>
                   </div>
@@ -412,7 +567,7 @@ export default function ChargePage() {
             <button
               key={item.key}
               onClick={() => handleAmountInput(item.key)}
-              className="py-5 text-center text-xl font-medium border-t border-r border-gray-200 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+              className="py-5 text-center text-xl font-medium border-t border-r border-gray-200 hover:bg-gray-50 active:bg-gray-100 transition-colors cursor-pointer"
             >
               {item.label}
             </button>
@@ -427,8 +582,8 @@ export default function ChargePage() {
               disabled={!amount || !!amountError}
               className={`w-full py-4 rounded-full text-center text-white font-medium text-lg ${
                 amount && !amountError
-                  ? "bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)]"
-                  : "bg-gray-300"
+                  ? "bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)] cursor-pointer"
+                  : "bg-gray-300 cursor-not-allowed"
               }`}
             >
               다음
@@ -439,8 +594,8 @@ export default function ChargePage() {
               disabled={!selectedCurrency}
               className={`w-full py-4 rounded-full text-center text-white font-medium text-lg ${
                 selectedCurrency
-                  ? "bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)]"
-                  : "bg-gray-300"
+                  ? "bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)] cursor-pointer"
+                  : "bg-gray-300 cursor-not-allowed"
               }`}
             >
               계좌 추가하기
@@ -455,7 +610,7 @@ export default function ChargePage() {
   const renderPinInput = () => (
     <div className="flex flex-col h-full">
       <header className="flex items-center justify-between p-4 border-b border-gray-200 bg-white">
-        <button onClick={() => setStep(1)} className="text-gray-700">
+        <button onClick={() => setStep(1)} className="text-gray-700 cursor-pointer">
           <ChevronLeft size={24} />
         </button>
         <h1 className="text-lg font-medium">암호 입력</h1>
@@ -521,9 +676,10 @@ export default function ChargePage() {
         <div className="p-4">
           <button
             onClick={handleNext}
-            className="h-[60px] w-full rounded-[30px] bg-[#0DAEFF] text-center text-lg font-medium text-white shadow-[7px_7px_10px_0px_#D9D9D9] transition-all hover:bg-[#0A9EE8]"
+            disabled={isLoading}
+            className={`h-[60px] w-full rounded-[30px] bg-[#0DAEFF] text-center text-lg font-medium text-white shadow-[7px_7px_10px_0px_#D9D9D9] transition-all hover:bg-[#0A9EE8] ${isLoading ? 'opacity-60 cursor-not-allowed' : ''}`}
           >
-            확인
+            {isLoading ? '처리 중...' : '확인'}
           </button>
         </div>
       )}
@@ -533,63 +689,30 @@ export default function ChargePage() {
   // Render success modal
   const renderSuccessModal = () => (
     <ModalPortal>
-      <style jsx global>{`
-        body {
-          overflow: hidden;
-        }
-        
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        
-        @keyframes scaleIn {
-          from { transform: scale(0.95); opacity: 0; }
-          to { transform: scale(1); opacity: 1; }
-        }
-        
-        @keyframes pulse {
-          0% { transform: scale(1); }
-          50% { transform: scale(1.05); }
-          100% { transform: scale(1); }
-        }
-      `}</style>
-      <div
-        className="fixed inset-0 z-50"
+      <div 
+        className="fixed inset-0 z-50 flex items-center justify-center"
         style={{
           backgroundColor: "rgba(0, 0, 0, 0.5)",
-          backdropFilter: "blur(2px)",
-          animation: "fadeIn 0.3s ease-out",
+          backdropFilter: "blur(4px)",
         }}
       >
-        <div className="fixed inset-0 flex items-center justify-center">
+        <div className="rounded-lg bg-white p-6 shadow-lg w-80 text-center">
           <div
-            className="bg-white w-full max-w-xs rounded-2xl overflow-hidden shadow-xl"
-            style={{
-              animation: "scaleIn 0.3s ease-out",
-            }}
+            className="w-16 h-16 rounded-full bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] flex items-center justify-center mx-auto mb-6 shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3)]"
+            style={{ animation: "pulse 1.5s infinite" }}
           >
-            <div className="p-6 text-center">
-              <div
-                className="w-16 h-16 rounded-full bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] flex items-center justify-center mx-auto mb-6 shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3)]"
-                style={{ animation: "pulse 1.5s infinite" }}
-              >
-                <Check size={32} className="text-white" />
-              </div>
-
-              <h2 className="text-xl font-medium mb-2">충전 완료</h2>
-              <p className="text-lg font-bold text-blue-500">
-                {amount ? formatCurrency(amount, selectedCurrency?.code || "") : ""}
-              </p>
-
-              <button
-                onClick={() => router.push("/home")}
-                className="w-full py-4 bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] text-white font-medium rounded-full text-lg mt-6 shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)]"
-              >
-                확인
-              </button>
-            </div>
+            <Check size={32} className="text-white" />
           </div>
+          <h2 className="text-xl font-medium mb-2">충전 완료</h2>
+          <p className="text-lg font-bold text-blue-500">
+            {amount ? formatCurrency(amount, selectedCurrency?.code || "") : ""}
+          </p>
+          <button
+            onClick={() => router.push("/home")}
+            className="w-full py-4 bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] text-white font-medium rounded-full text-lg mt-6 shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)]"
+          >
+            확인
+          </button>
         </div>
       </div>
     </ModalPortal>
@@ -598,61 +721,40 @@ export default function ChargePage() {
   // Render account selection modal
   const renderAccountModal = () => (
     <ModalPortal>
-      <style jsx global>{`
-        body {
-          overflow: hidden;
-        }
-        
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        
-        @keyframes slideUp {
-          from { transform: translateY(100%); }
-          to { transform: translateY(0); }
-        }
-      `}</style>
-      <div
-        className="fixed inset-0 z-50"
+      <div 
+        className="fixed inset-0 z-50 flex items-center justify-center"
         style={{
           backgroundColor: "rgba(0, 0, 0, 0.5)",
-          backdropFilter: "blur(2px)",
-          animation: "fadeIn 0.3s ease-out",
+          backdropFilter: "blur(4px)",
         }}
         onClick={() => setShowAccountModal(false)}
       >
         <div
-          className="fixed bottom-0 left-0 right-0 z-50 rounded-t-xl bg-white p-6 shadow-xl"
-          style={{
-            animation: "slideUp 0.3s ease-out",
-            maxHeight: "90vh",
-            overflowY: "auto",
-          }}
+          className="rounded-lg bg-white p-6 shadow-lg w-80 text-center"
           onClick={(e) => e.stopPropagation()}
         >
           <h2 className="text-xl font-bold mb-6">출금 계좌 선택</h2>
-
           {filteredAccounts.length > 0 && (
             <div className="space-y-4 mb-6">
               {filteredAccounts.map((account, index) => (
                 <button
                   key={index}
-                  className="flex items-center w-full p-3 hover:bg-gray-50 rounded-lg transition-colors"
+                  className="flex items-center w-full p-3 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer"
                   onClick={() => handleSelectAccount(account)}
                 >
                   <div className="w-12 h-12 rounded-full flex items-center justify-center mr-3 overflow-hidden bg-white border border-gray-100 shadow-sm">
                     <Image
-                      src={account.logoSrc || "/placeholder.svg"}
-                      alt={account.bankName}
+                      src="/images/hwanbi-bank-logo.png"
+                      alt="환비 은행"
                       width={48}
                       height={48}
                       className="object-contain"
+                      priority
                     />
                   </div>
                   <div className="text-left">
                     <div className="flex items-center">
-                      <span className="font-medium text-gray-800">{account.bankName}</span>
+                      <span className="font-medium text-gray-800">환비 은행</span>
                       <span className="ml-2 text-xs px-2 py-0.5 bg-blue-50 text-blue-500 rounded-full">주계좌</span>
                     </div>
                     <div className="text-gray-500">{account.accountNumber}</div>
@@ -661,18 +763,16 @@ export default function ChargePage() {
               ))}
             </div>
           )}
-
           <button
             onClick={handleAddAccount}
-            className="w-full py-4 bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] text-white font-medium rounded-full flex items-center justify-center text-lg shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)]"
+            className="w-full py-4 bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] text-white font-medium rounded-full flex items-center justify-center text-lg shadow-[0_4px_6px_-1px_rgba(77,169,255,0.3),0_2px_4px_-2px_rgba(77,169,255,0.2)] cursor-pointer"
           >
             <Plus size={20} className="mr-2" />
             계좌 추가
           </button>
-
           <button
             onClick={() => setShowAccountModal(false)}
-            className="w-full py-4 mt-3 border border-gray-300 text-gray-700 font-medium rounded-full text-lg"
+            className="w-full py-4 mt-3 border border-gray-300 text-gray-700 font-medium rounded-full text-lg cursor-pointer"
           >
             취소
           </button>
