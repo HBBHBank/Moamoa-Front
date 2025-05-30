@@ -9,7 +9,7 @@ export default function WalletGuidePage() {
   return (
     <div className="flex min-h-screen flex-col bg-white">
       <header className="flex items-center justify-between border-b border-gray-200 bg-white p-4">
-        <button onClick={() => router.back()} className="text-gray-700">
+        <button onClick={() => router.back()} className="text-gray-700 cursor-pointer">
           <ChevronLeft size={24} />
         </button>
         <h1 className="text-lg font-medium">안내</h1>
