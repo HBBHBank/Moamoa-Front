@@ -2,18 +2,45 @@
 
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { getValidToken } from "@/lib/auth"
+import { mapCurrencyToFlag } from "@/lib/utils"
 
-const wallets = [
-  { code: "KRW", name: "대한민국 원화", balance: 1379, flag: "/images/flags/korea.png" },
-  { code: "USD", name: "미국 달러", balance: 100, flag: "/images/flags/usa.png" },
-  { code: "JPY", name: "일본 엔화", balance: 5000, flag: "/images/flags/japan.png" },
-]
+// 타입 정의
+interface Wallet {
+  walletId: number;
+  currencyCode: string;
+  currencyName: string;
+  balance: number;
+  walletNumber: string;
+  userName: string;
+}
 
 export default function PaymentMainPage() {
   const router = useRouter()
   const [walletModal, setWalletModal] = useState(false)
-  const [selectedWallet, setSelectedWallet] = useState(wallets[0])
+  const [wallets, setWallets] = useState<Wallet[]>([])
+  const [selectedWallet, setSelectedWallet] = useState<Wallet | null>(null)
+
+  useEffect(() => {
+    // 실제 API로 지갑 목록 조회
+    const fetchWallets = async () => {
+      try {
+        const token = await getValidToken()
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/wallet/all`, {
+          headers: { Authorization: `Bearer ${token}` },
+          credentials: "include"
+        })
+        const data = await res.json()
+        setWallets(data.result)
+        setSelectedWallet(data.result[0] || null)
+      } catch {
+        setWallets([])
+        setSelectedWallet(null)
+      }
+    }
+    fetchWallets()
+  }, [])
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -34,8 +61,8 @@ export default function PaymentMainPage() {
           <div className="flex flex-col gap-1">
             <span className="text-xs text-gray-400 mb-1">사용 가능 금액</span>
             <div className="flex items-end gap-2">
-              <span className="text-4xl font-extrabold text-gray-800 tracking-tight">{selectedWallet.balance.toLocaleString()}</span>
-              <span className="ml-1 text-xl font-bold text-gray-500">{selectedWallet.code}</span>
+              <span className="text-4xl font-extrabold text-gray-800 tracking-tight">{selectedWallet ? selectedWallet.balance.toLocaleString() : '-'}</span>
+              <span className="ml-1 text-xl font-bold text-gray-500">{selectedWallet ? selectedWallet.currencyCode : ''}</span>
             </div>
           </div>
           <div className="flex gap-2 ml-4">
@@ -100,16 +127,17 @@ export default function PaymentMainPage() {
             <div className="space-y-2">
               {wallets.map(w => (
                 <button
-                  key={w.code}
-                  className={`flex items-center w-full p-3 rounded-xl border transition-all duration-150 shadow-sm hover:shadow-md active:scale-95 active:shadow-inner cursor-pointer ${selectedWallet.code === w.code ? "border-[#2566CF] bg-[#F3F6FA] shadow-lg" : "border-gray-100 bg-white"}`}
+                  key={w.walletId}
+                  className={`flex items-center w-full p-3 rounded-xl border transition-all duration-150 shadow-sm hover:shadow-md active:scale-95 active:shadow-inner cursor-pointer ${selectedWallet && selectedWallet.walletId === w.walletId ? "border-[#2566CF] bg-[#F3F6FA] shadow-lg" : "border-gray-100 bg-white"}`}
                   onClick={() => { setSelectedWallet(w); setWalletModal(false); }}
                 >
-                  <Image src={w.flag} alt={w.code} width={28} height={28} className="rounded-full mr-3" />
+                  {/* 통화별 국기 이미지 매핑 필요시 utils 사용 */}
+                  <Image src={`/images/flags/${mapCurrencyToFlag(w.currencyCode)}`} alt={w.currencyCode} width={28} height={28} className="rounded-full mr-3" />
                   <div className="flex-1 text-left">
-                    <div className="font-medium text-gray-800">{w.name}</div>
-                    <div className="text-xs text-gray-500">{w.balance.toLocaleString()} {w.code}</div>
+                    <div className="font-medium text-gray-800">{w.currencyName}</div>
+                    <div className="text-xs text-gray-500">{w.balance.toLocaleString()} {w.currencyCode}</div>
                   </div>
-                  {selectedWallet.code === w.code && (
+                  {selectedWallet && selectedWallet.walletId === w.walletId && (
                     <svg width="20" height="20" fill="none" stroke="#2566CF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="5 11 9 15 15 7"/></svg>
                   )}
                 </button>

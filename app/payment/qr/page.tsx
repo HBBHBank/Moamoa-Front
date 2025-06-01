@@ -5,12 +5,39 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import QrScanner from "qr-scanner"
 import { QrCode, RefreshCw } from "lucide-react"
+import { getValidToken } from "@/lib/auth"
+import { mapCurrencyToFlag } from "@/lib/utils"
+import axios from "axios"
 
-const wallets = [
-  { code: "KRW", name: "대한민국 원화", balance: 1379, flag: "/images/flags/korea.png" },
-  { code: "USD", name: "미국 달러", balance: 100, flag: "/images/flags/usa.png" },
-  { code: "JPY", name: "일본 엔화", balance: 5000, flag: "/images/flags/japan.png" },
-]
+// 타입 정의
+interface Wallet {
+  walletId: number;
+  currencyCode: string;
+  currencyName: string;
+  balance: number;
+  walletNumber: string;
+  userName: string;
+}
+
+interface QrCodeInfoResponseDto {
+  walletId: number;
+  ownerName: string;
+  currencyCode: string;
+}
+
+// 에러 코드별 메시지 매핑 함수
+function getPaymentErrorMessage(errorCode: string, defaultMsg: string) {
+  switch (errorCode) {
+    case "QR_001":
+      return "QR 코드 생성에 실패했습니다.";
+    case "QR_002":
+      return "잘못된 파라미터입니다.";
+    case "QR_003":
+      return "QR 코드가 만료되었습니다.";
+    default:
+      return defaultMsg || "알 수 없는 오류가 발생했습니다.";
+  }
+}
 
 export default function PaymentQRPage() {
   const router = useRouter()
@@ -18,8 +45,78 @@ export default function PaymentQRPage() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [qrError, setQrError] = useState(false)
   const [walletModal, setWalletModal] = useState(false)
-  const [selectedWallet, setSelectedWallet] = useState(wallets[0])
+  const [wallets, setWallets] = useState<Wallet[]>([])
+  const [selectedWallet, setSelectedWallet] = useState<Wallet | null>(null)
   const [infoModal, setInfoModal] = useState(false)
+  const [qrImageId, setQrImageId] = useState<number | null>(null)
+  const [qrBlobUrl, setQrBlobUrl] = useState<string | null>(null)
+  const [qrBlobLoading, setQrBlobLoading] = useState(false)
+  const [qrBlobError, setQrBlobError] = useState<string | null>(null)
+  const [isQrLoading, setIsQrLoading] = useState(false)
+  const [qrScanResult, setQrScanResult] = useState<string | null>(null)
+  const [qrScanInfo, setQrScanInfo] = useState<QrCodeInfoResponseDto | null>(null)
+  const [paymentAmount, setPaymentAmount] = useState<string>("")
+  const [isPaying, setIsPaying] = useState(false)
+  const [paySuccess, setPaySuccess] = useState(false)
+  const [payError, setPayError] = useState<string | null>(null)
+  const [qrErrorMsg, setQrErrorMsg] = useState<string | null>(null)
+
+  // 실제 API로 지갑 목록 조회
+  useEffect(() => {
+    const fetchWallets = async () => {
+      try {
+        const token = await getValidToken();
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/wallet/all`, {
+          headers: { Authorization: `Bearer ${token}` },
+          credentials: "include"
+        })
+        const data = await res.json()
+        setWallets(data.result)
+        setSelectedWallet(data.result[0] || null)
+      } catch {
+        setWallets([])
+        setSelectedWallet(null)
+      }
+    }
+    fetchWallets()
+  }, [])
+
+  // QR 생성
+  const handleGenerateQr = async () => {
+    if (!selectedWallet) return;
+    setIsQrLoading(true);
+    setQrImageId(null);
+    setQrErrorMsg(null);
+    try {
+      const token = await getValidToken();
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/payments/${selectedWallet.walletId}/qr-code`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        credentials: "include"
+      })
+      const data = await res.json()
+      if (data.code && data.code !== "SUCCESS") {
+        setQrImageId(null);
+        setQrErrorMsg(getPaymentErrorMessage(data.code, data.message));
+        setIsQrLoading(false);
+        return;
+      }
+      const qrImageId = data.result.qrImageId
+      setQrImageId(qrImageId)
+    } catch {
+      setQrImageId(null)
+      setQrErrorMsg("QR 코드 생성에 실패했습니다.");
+    }
+    setIsQrLoading(false);
+  }
+
+  // QR 생성 탭 진입 시 자동 생성
+  useEffect(() => {
+    if (tab === "generate" && selectedWallet && !qrImageId && !isQrLoading) {
+      handleGenerateQr();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, selectedWallet]);
 
   // QR 스캔 탭에서만 카메라 활성화
   useEffect(() => {
@@ -33,9 +130,20 @@ export default function PaymentQRPage() {
           if (videoRef.current) {
             qrScanner = new QrScanner(
               videoRef.current,
-              result => {
-                // 실제 서비스에서는 result.data 활용
-                alert(`QR 인식: ${result.data}`)
+              async result => {
+                setQrScanResult(result.data)
+                // QR 코드 정보 조회
+                try {
+                  const token = await getValidToken();
+                  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/payments/qr-code/${result.data}`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                    credentials: "include"
+                  })
+                  const data = await res.json()
+                  setQrScanInfo(data.result)
+                } catch {
+                  setQrScanInfo(null)
+                }
               },
               {
                 preferredCamera: "environment",
@@ -52,6 +160,77 @@ export default function PaymentQRPage() {
       if (qrScanner) qrScanner.destroy()
     }
   }, [tab])
+
+  // QR 이미지 Blob fetch (인증 필요시)
+  useEffect(() => {
+    if (!qrImageId) return;
+    let revokeUrl: string | null = null;
+    setQrBlobLoading(true);
+    setQrBlobError(null);
+    setQrBlobUrl(null);
+    (async () => {
+      try {
+        const token = await getValidToken();
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/v1/payments/qr-code-images/${qrImageId}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            credentials: "include",
+          }
+        );
+        if (!res.ok) {
+          setQrBlobError("QR 이미지 로드 실패");
+          setQrBlobLoading(false);
+          return;
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        setQrBlobUrl(url);
+        revokeUrl = url;
+      } catch {
+        setQrBlobError("QR 이미지 로드 실패");
+      } finally {
+        setQrBlobLoading(false);
+      }
+    })();
+    return () => {
+      if (revokeUrl) URL.revokeObjectURL(revokeUrl);
+    };
+  }, [qrImageId]);
+
+  // 결제 요청
+  const handlePay = async () => {
+    if (!qrScanInfo || !selectedWallet) return;
+    setIsPaying(true);
+    setPayError(null);
+    try {
+      const token = await getValidToken();
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/payments/use/${qrScanResult}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          sellerWalletId: qrScanInfo.walletId,
+          currencyCode: qrScanInfo.currencyCode,
+          amount: paymentAmount
+        })
+      })
+      if (!res.ok) {
+        const errData = await res.json()
+        setPayError(getPaymentErrorMessage(errData.code, errData.message))
+        setPaySuccess(false)
+      } else {
+        setPaySuccess(true)
+      }
+    } catch {
+      setPayError("결제 실패")
+      setPaySuccess(false)
+    }
+    setIsPaying(false);
+  }
 
   return (
     <div className="min-h-screen bg-[#fafafa] flex flex-col">
@@ -107,24 +286,40 @@ export default function PaymentQRPage() {
                 <Image src="/images/moamoa-header-logo.png" alt="MOAMOA" width={90} height={32} className="object-contain" />
                 <div className="flex gap-2">
                   <button className="w-8 h-8 flex items-center justify-center rounded-full bg-[#f5f5f5] text-gray-400 text-base shadow border border-gray-200 hover:bg-gray-200 cursor-pointer transition" onClick={() => setInfoModal(true)}><span className="text-lg font-bold">?</span></button>
-                  <button className="w-8 h-8 flex items-center justify-center rounded-full bg-[#f5f5f5] text-gray-400 text-base shadow border border-gray-200 hover:bg-gray-200 cursor-pointer transition"><RefreshCw className="w-5 h-5" /></button>
+                  <button className="w-8 h-8 flex items-center justify-center rounded-full bg-[#f5f5f5] text-gray-400 text-base shadow border border-gray-200 hover:bg-gray-200 cursor-pointer transition" onClick={handleGenerateQr}><RefreshCw className="w-5 h-5" /></button>
                 </div>
               </div>
               {/* QR 생성 영역 */}
               <div className="flex-1 w-full flex flex-col items-center justify-center pb-8">
                 <div className="mx-auto mt-2 mb-2 w-64 h-64 rounded-lg bg-[#ddd] flex items-center justify-center">
-                  <span className="text-gray-700 text-base">QR 생성</span>
+                  {isQrLoading ? (
+                    <span className="text-gray-700 text-base">로딩 중...</span>
+                  ) : qrImageId ? (
+                    qrBlobLoading ? (
+                      <span className="text-gray-700 text-base">QR 이미지 로딩 중...</span>
+                    ) : qrBlobError ? (
+                      <span className="text-red-600 text-base">{qrBlobError}</span>
+                    ) : qrBlobUrl ? (
+                      <img src={qrBlobUrl} alt="QR 코드" className="w-full h-full object-contain" />
+                    ) : null
+                  ) : (
+                    qrErrorMsg && <div className="mt-2 text-red-600 text-sm text-center">{qrErrorMsg}</div>
+                  )}
                 </div>
               </div>
             </div>
             {/* 결제지갑/금액/지갑변경/충전하기 카드 */}
             <div className="w-full max-w-[420px] rounded-2xl bg-white p-4 flex items-center justify-between shadow-md border border-gray-100 mt-2">
               <div className="flex items-center gap-3">
-                <Image src={selectedWallet.flag} alt={selectedWallet.code} width={32} height={32} className="rounded-full" />
-                <div className="flex flex-col">
-                  <span className="text-xs text-gray-400 mb-0.5">결제할 지갑</span>
-                  <span className="text-xl font-bold text-gray-900">{selectedWallet.balance.toLocaleString()} {selectedWallet.code}</span>
-                </div>
+                {selectedWallet && (
+                  <>
+                    <Image src={`/images/flags/${mapCurrencyToFlag(selectedWallet.currencyCode)}`} alt={selectedWallet.currencyCode} width={32} height={32} className="rounded-full" />
+                    <div className="flex flex-col">
+                      <span className="text-xs text-gray-400 mb-0.5">결제할 지갑</span>
+                      <span className="text-xl font-bold text-gray-900">{selectedWallet.balance.toLocaleString()} {selectedWallet.currencyCode}</span>
+                    </div>
+                  </>
+                )}
               </div>
               <div className="flex gap-2">
                 <button className="rounded-full bg-[#f5f5f5] text-gray-400 text-sm px-4 py-2 font-semibold hover:bg-[#e6eaf0] transition cursor-pointer" onClick={() => setWalletModal(true)}>지갑변경</button>
@@ -152,13 +347,41 @@ export default function PaymentQRPage() {
                 )}
               </div>
             </div>
+            {/* QR 스캔 결과 및 결제 UI */}
+            {qrScanInfo && (
+              <div className="w-full max-w-[420px] rounded-2xl bg-white p-4 flex flex-col items-center shadow-md border border-gray-100 mt-2">
+                <div className="mb-2 text-gray-700 font-semibold">판매자: {qrScanInfo.ownerName}</div>
+                <div className="mb-2 text-gray-700">통화: {qrScanInfo.currencyCode}</div>
+                <input
+                  type="number"
+                  className="w-full rounded-lg border border-gray-300 p-2 mb-2"
+                  placeholder="결제 금액 입력"
+                  value={paymentAmount}
+                  onChange={event => setPaymentAmount(event.target.value)}
+                  min={0}
+                />
+                <button
+                  className="w-full rounded-lg bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] py-2 text-center font-medium text-white shadow-md disabled:bg-gray-300 cursor-pointer"
+                  onClick={handlePay}
+                  disabled={isPaying || !paymentAmount}
+                >
+                  {isPaying ? "결제 중..." : "결제하기"}
+                </button>
+                {paySuccess && <div className="mt-2 text-green-600">결제 성공!</div>}
+                {payError && <div className="mt-2 text-red-600">{payError}</div>}
+              </div>
+            )}
             <div className="w-full max-w-[420px] rounded-2xl bg-white p-4 flex items-center justify-between shadow-md border border-gray-100 mt-2">
               <div className="flex items-center gap-3">
-                <Image src={selectedWallet.flag} alt={selectedWallet.code} width={32} height={32} className="rounded-full" />
-                <div className="flex flex-col">
-                  <span className="text-xs text-gray-400 mb-0.5">결제할 지갑</span>
-                  <span className="text-xl font-bold text-gray-900">{selectedWallet.balance.toLocaleString()} {selectedWallet.code}</span>
-                </div>
+                {selectedWallet && (
+                  <>
+                    <Image src={`/images/flags/${mapCurrencyToFlag(selectedWallet.currencyCode)}`} alt={selectedWallet.currencyCode} width={32} height={32} className="rounded-full" />
+                    <div className="flex flex-col">
+                      <span className="text-xs text-gray-400 mb-0.5">결제할 지갑</span>
+                      <span className="text-xl font-bold text-gray-900">{selectedWallet.balance.toLocaleString()} {selectedWallet.currencyCode}</span>
+                    </div>
+                  </>
+                )}
               </div>
               <div className="flex gap-2">
                 <button className="rounded-full bg-[#f5f5f5] text-gray-400 text-sm px-4 py-2 font-semibold hover:bg-[#e6eaf0] transition cursor-pointer" onClick={() => setWalletModal(true)}>지갑변경</button>
@@ -186,16 +409,16 @@ export default function PaymentQRPage() {
             <div className="space-y-2">
               {wallets.map(w => (
                 <button
-                  key={w.code}
-                  className={`flex items-center w-full p-3 rounded-xl border transition-all duration-150 shadow-sm hover:shadow-md active:scale-95 active:shadow-inner cursor-pointer ${selectedWallet.code === w.code ? "border-[#2566CF] bg-[#F3F6FA] shadow-lg" : "border-gray-100 bg-white"}`}
+                  key={w.walletId}
+                  className={`flex items-center w-full p-3 rounded-xl border transition-all duration-150 shadow-sm hover:shadow-md active:scale-95 active:shadow-inner cursor-pointer ${selectedWallet && selectedWallet.walletId === w.walletId ? "border-[#2566CF] bg-[#F3F6FA] shadow-lg" : "border-gray-100 bg-white"}`}
                   onClick={() => { setSelectedWallet(w); setWalletModal(false); }}
                 >
-                  <Image src={w.flag} alt={w.code} width={28} height={28} className="rounded-full mr-3" />
+                  <Image src={`/images/flags/${mapCurrencyToFlag(w.currencyCode)}`} alt={w.currencyCode} width={28} height={28} className="rounded-full mr-3" />
                   <div className="flex-1 text-left">
-                    <div className="font-medium text-gray-800">{w.name}</div>
-                    <div className="text-xs text-gray-500">{w.balance.toLocaleString()} {w.code}</div>
+                    <div className="font-medium text-gray-800">{w.currencyName}</div>
+                    <div className="text-xs text-gray-500">{w.balance.toLocaleString()} {w.currencyCode}</div>
                   </div>
-                  {selectedWallet.code === w.code && (
+                  {selectedWallet && selectedWallet.walletId === w.walletId && (
                     <svg width="20" height="20" fill="none" stroke="#2566CF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="5 11 9 15 15 7"/></svg>
                   )}
                 </button>
@@ -214,9 +437,9 @@ export default function PaymentQRPage() {
             </button>
             <div className="font-bold text-lg text-gray-800 mb-4">QR 결제 안내</div>
             <div className="text-gray-700 text-base mb-4 whitespace-pre-line">
-              <span className="font-semibold text-[#2566CF]">QR 생성</span>\n
-              상대가 나의 QR 코드를 스캔하고, 상대가 금액을 입력하면 내가 선택한 지갑으로 해당 금액만큼 포인트가 입금됩니다.\n\n
-              <span className="font-semibold text-[#2566CF]">QR 스캔</span>\n
+              <span className="font-semibold text-[#2566CF]">QR 생성</span>{"\n"}
+              상대가 나의 QR 코드를 스캔하고, 상대가 금액을 입력하면 내가 선택한 지갑으로 해당 금액만큼 포인트가 입금됩니다.{"\n\n"}
+              <span className="font-semibold text-[#2566CF]">QR 스캔</span>{"\n"}
               내가 결제할 상대의 QR 코드를 스캔해주세요! 결제할 금액을 입력하면, 해당 금액만큼의 돈이 상대에게 입금됩니다.
             </div>
             <div className="font-semibold text-[#2566CF] mb-2">명심하세요!</div>
@@ -225,6 +448,82 @@ export default function PaymentQRPage() {
               <li>QR 결제는 같은 통화끼리만 이용이 가능합니다.</li>
             </ul>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// DEMO: 수동 walletId 입력으로 QR 생성 테스트용 컴포넌트
+export function GenerateQrPage() {
+  const [qrImageId, setQrImageId] = useState<number | null>(null)
+  const [walletId, setWalletId] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+
+  const handleGenerateQr = async () => {
+    try {
+      setIsLoading(true)
+      setQrImageId(null)
+      const token = await getValidToken()
+      const res = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/payments/${walletId}/qr-code`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          withCredentials: true,
+        }
+      )
+      const qrImageId = res.data?.result?.qrImageId || res.data?.data?.qrImageId
+      setQrImageId(qrImageId)
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        alert(
+          err.response?.data?.message
+            ? `QR 코드 생성 실패: ${err.response.data.message}`
+            : "QR 코드 생성에 실패했습니다."
+        )
+        console.error(err)
+      } else {
+        alert("QR 코드 생성에 실패했습니다.")
+        console.error(err)
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <div className="p-6 max-w-md mx-auto">
+      <h1 className="text-xl font-bold mb-4">QR 코드 생성 (테스트용)</h1>
+
+      <input
+        type="text"
+        placeholder="지갑 ID 입력"
+        value={walletId}
+        onChange={(e) => setWalletId(e.target.value)}
+        className="w-full p-2 border rounded mb-4"
+      />
+
+      <button
+        onClick={handleGenerateQr}
+        className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600"
+        disabled={isLoading || !walletId}
+      >
+        {isLoading ? "생성 중..." : "생성하기"}
+      </button>
+
+      {qrImageId && (
+        <div className="mt-6 text-center">
+          <p className="mb-2 font-medium">생성된 QR 코드:</p>
+          {qrImageId ? (
+            qrImageId && (
+              <img
+                src={`${process.env.NEXT_PUBLIC_API_URL}/api/v1/payments/qr-code-images/${qrImageId}`}
+                alt="QR 코드"
+                className="mx-auto border p-2 rounded"
+              />
+            )
+          ) : null}
         </div>
       )}
     </div>
