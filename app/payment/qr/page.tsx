@@ -7,7 +7,6 @@ import QrScanner from "qr-scanner"
 import { QrCode, RefreshCw } from "lucide-react"
 import { getValidToken } from "@/lib/auth"
 import { mapCurrencyToFlag } from "@/lib/utils"
-import axios from "axios"
 
 // 타입 정의
 interface Wallet {
@@ -448,82 +447,6 @@ export default function PaymentQRPage() {
               <li>QR 결제는 같은 통화끼리만 이용이 가능합니다.</li>
             </ul>
           </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// DEMO: 수동 walletId 입력으로 QR 생성 테스트용 컴포넌트
-export function GenerateQrPage() {
-  const [qrImageId, setQrImageId] = useState<number | null>(null)
-  const [walletId, setWalletId] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-
-  const handleGenerateQr = async () => {
-    try {
-      setIsLoading(true)
-      setQrImageId(null)
-      const token = await getValidToken()
-      const res = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/payments/${walletId}/qr-code`,
-        {},
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          withCredentials: true,
-        }
-      )
-      const qrImageId = res.data?.result?.qrImageId || res.data?.data?.qrImageId
-      setQrImageId(qrImageId)
-    } catch (err: unknown) {
-      if (axios.isAxiosError(err)) {
-        alert(
-          err.response?.data?.message
-            ? `QR 코드 생성 실패: ${err.response.data.message}`
-            : "QR 코드 생성에 실패했습니다."
-        )
-        console.error(err)
-      } else {
-        alert("QR 코드 생성에 실패했습니다.")
-        console.error(err)
-      }
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  return (
-    <div className="p-6 max-w-md mx-auto">
-      <h1 className="text-xl font-bold mb-4">QR 코드 생성 (테스트용)</h1>
-
-      <input
-        type="text"
-        placeholder="지갑 ID 입력"
-        value={walletId}
-        onChange={(e) => setWalletId(e.target.value)}
-        className="w-full p-2 border rounded mb-4"
-      />
-
-      <button
-        onClick={handleGenerateQr}
-        className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600"
-        disabled={isLoading || !walletId}
-      >
-        {isLoading ? "생성 중..." : "생성하기"}
-      </button>
-
-      {qrImageId && (
-        <div className="mt-6 text-center">
-          <p className="mb-2 font-medium">생성된 QR 코드:</p>
-          {qrImageId ? (
-            qrImageId && (
-              <img
-                src={`${process.env.NEXT_PUBLIC_API_URL}/api/v1/payments/qr-code-images/${qrImageId}`}
-                alt="QR 코드"
-                className="mx-auto border p-2 rounded"
-              />
-            )
-          ) : null}
         </div>
       )}
     </div>
