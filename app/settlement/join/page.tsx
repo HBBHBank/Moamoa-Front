@@ -1,11 +1,10 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect } from "react"
 import { ChevronLeft, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
+import { getValidToken } from "@/lib/auth"
 
 export default function JoinSettlementGroupPage() {
   const router = useRouter()
@@ -14,8 +13,6 @@ export default function JoinSettlementGroupPage() {
 
   const [code, setCode] = useState(inviteCode)
   const [codeError, setCodeError] = useState("")
-  const [remainingAttempts, setRemainingAttempts] = useState(5)
-  const [walletBalances, setWalletBalances] = useState<any[]>([])
   const [hasWallet, setHasWallet] = useState(false)
 
   // Load wallet balances from localStorage on mount
@@ -31,7 +28,6 @@ export default function JoinSettlementGroupPage() {
     const storedBalances = localStorage.getItem("walletBalances")
     if (storedBalances) {
       const parsedBalances = JSON.parse(storedBalances)
-      setWalletBalances(parsedBalances)
       setHasWallet(parsedBalances.length > 0)
     }
 
@@ -48,84 +44,72 @@ export default function JoinSettlementGroupPage() {
     setCodeError("")
   }
 
-  const handleJoinGroup = () => {
+  const handleJoinGroup = async () => {
     if (!code.trim()) {
       setCodeError("초대 코드를 입력해주세요.")
       return
     }
 
     if (!hasWallet) {
-      alert("지갑이 없어 정산 그룹에 참여할 수 없습니다. 먼저 지갑을 생성해주세요.")
+      setCodeError("지갑이 없어 정산 그룹에 참여할 수 없습니다. 먼저 지갑을 생성해주세요.")
       router.push("/wallet/charge")
       return
     }
 
-    // Check if code matches any existing group
-    const storedMyGroups = localStorage.getItem("mySettlementGroups")
-    const myGroups = storedMyGroups ? JSON.parse(storedMyGroups) : []
+    try {
+      const token = await getValidToken();
 
-    const matchingGroup = myGroups.find((group: any) => group.inviteCode === code.trim())
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/settlement-groups/verify-code`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+        body: JSON.stringify({ joinCode: code.trim() })
+      });
 
-    if (matchingGroup) {
-      // Check if invite code is expired
-      const expiryDate = new Date(matchingGroup.inviteExpiry)
-      if (new Date() > expiryDate) {
-        setCodeError("초대 코드가 만료되었습니다. 방장에게 재발급을 요청하세요.")
-        return
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        setCodeError(errorData.message || '초대 코드 검증에 실패했습니다.');
+        return;
       }
 
-      // Check if group is full
-      if (matchingGroup.memberCount >= matchingGroup.maxMembers) {
-        setCodeError("그룹 인원이 가득 찼습니다.")
-        return
+      const result = await response.json();
+      console.log("verify join code API result:", result);
+      const verifyData = result.result || result.data || result;
+      if (!verifyData || !verifyData.groupId) {
+        setCodeError("유효하지 않은 응답입니다.");
+        return;
       }
 
-      // Add user to the group
-      const updatedGroup = {
-        ...matchingGroup,
-        memberCount: matchingGroup.memberCount + 1,
+      // 이미 멤버인 경우 메시지에 따라 바로 이동
+      if (!verifyData.isValid) {
+        if (verifyData.message && verifyData.message.includes("이미 참여한 그룹")) {
+          alert("이미 참여한 그룹입니다. 해당 그룹으로 이동합니다.");
+          router.push(`/settlement/group/${verifyData.groupId}?allowIfJoinCodeValid=true`);
+          return;
+        }
+        setCodeError(verifyData.message || "초대 코드가 만료되었거나 유효하지 않습니다.");
+        return;
       }
 
-      // Update the group in myGroups
-      const updatedMyGroups = myGroups.map((group: any) => (group.id === matchingGroup.id ? updatedGroup : group))
-      localStorage.setItem("mySettlementGroups", JSON.stringify(updatedMyGroups))
-
-      // Add group to joinedGroups
-      const joinedGroup = {
-        ...matchingGroup,
-        isOwner: false,
-      }
-
-      const storedJoinedGroups = localStorage.getItem("joinedSettlementGroups")
-      const joinedGroups = storedJoinedGroups ? JSON.parse(storedJoinedGroups) : []
-      joinedGroups.push(joinedGroup)
-      localStorage.setItem("joinedSettlementGroups", JSON.stringify(joinedGroups))
-
-      // Navigate to the group
-      router.push(`/settlement/group/${matchingGroup.id}`)
-    } else {
-      // Decrease remaining attempts
-      const newAttempts = remainingAttempts - 1
-      setRemainingAttempts(newAttempts)
-
-      if (newAttempts <= 0) {
-        setCodeError("시도 횟수(5회)를 초과했습니다. 나중에 다시 시도해주세요.")
-        // Disable input for some time
-        setTimeout(() => {
-          setRemainingAttempts(5)
-          setCodeError("")
-        }, 60000) // 1 minute timeout
+      // allowIfJoinCodeValid=true로 설정하여 자동 멤버 등록되도록 이동
+      router.push(`/settlement/group/${verifyData.groupId}?allowIfJoinCodeValid=true`)
+    } catch (error) {
+      if (error instanceof Error && error.message === "No token found") {
+        router.push("/login");
       } else {
-        setCodeError(`유효하지 않은 초대 코드입니다. 남은 시도 횟수: ${newAttempts}회`)
+        setCodeError(error instanceof Error ? error.message : '그룹 참여 중 오류가 발생했습니다.');
       }
     }
-  }
+  };
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
       {/* Header */}
       <header className="flex items-center justify-between border-b border-gray-200 bg-white p-4">
-        <Link href="/settlement" className="text-gray-700">
+        <Link href="/settlement" className="text-gray-700 cursor-pointer">
           <ChevronLeft size={24} />
         </Link>
         <h1 className="text-lg font-medium">정산 그룹 참여</h1>
@@ -147,7 +131,6 @@ export default function JoinSettlementGroupPage() {
             className={`w-full rounded-lg border ${
               codeError ? "border-red-500" : "border-gray-300"
             } p-3 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500`}
-            disabled={remainingAttempts <= 0}
           />
           {codeError && (
             <p className="mt-1 flex items-center text-sm text-red-500">
@@ -161,7 +144,6 @@ export default function JoinSettlementGroupPage() {
           <h3 className="mb-2 font-medium text-blue-700">참여 안내</h3>
           <ul className="space-y-1 text-sm text-blue-600">
             <li>• 초대 코드는 생성 후 10분간 유효합니다.</li>
-            <li>• 보안을 위해 초대 코드 입력은 3회로 제한됩니다.</li>
             <li>• 정산 그룹에 참여하려면 지갑이 필요합니다.</li>
             <li>• 그룹 참여 후 정산 내역을 확인할 수 있습니다.</li>
           </ul>
@@ -172,11 +154,11 @@ export default function JoinSettlementGroupPage() {
       <div className="border-t border-gray-200 p-4">
         <button
           onClick={handleJoinGroup}
-          disabled={!code.trim() || remainingAttempts <= 0 || !hasWallet}
+          disabled={!code.trim() || !hasWallet}
           className={`w-full rounded-lg py-3 text-center font-medium text-white ${
-            code.trim() && remainingAttempts > 0 && hasWallet
-              ? "bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] shadow-md"
-              : "bg-gray-300"
+            code.trim() && hasWallet
+              ? "bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] shadow-md cursor-pointer"
+              : "bg-gray-300 cursor-not-allowed"
           }`}
         >
           참여하기

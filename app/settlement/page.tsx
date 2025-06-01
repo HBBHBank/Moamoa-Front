@@ -6,21 +6,39 @@ import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import ModalPortal from "@/components/modal-portal"
+import { getValidToken } from "@/lib/auth"
+import { mapCurrencyToFlag } from "@/lib/utils"
+
+type Wallet = {
+  id: number;
+  walletNumber: string;
+  balance: number;
+  currency: string;
+  ownerName: string;
+};
 
 type SettlementGroup = {
-  id: string
-  name: string
-  isActive: boolean
-  isOwner: boolean
-  memberCount: number
-  maxMembers: number
-  currency: string
-  flagSrc: string
-  inviteCode?: string
-  inviteExpiry?: Date
-  createdAt: Date
-  isSettling?: boolean
+  id: number;
+  name: string;
+  isActive: boolean;
+  isOwner: boolean;
+  memberCount: number;
+  maxMembers: number;
+  currencyCode: string;
+  currencyName: string;
+  settlementStatus: string;
+  createdAt: string;
+  flagSrc?: string;
+  members?: SettlementMember[];
 }
+
+type SettlementMember = {
+  userId: number;
+  name: string;
+  profileImage: string;
+  wallets: Wallet[];
+  hasTransferred: boolean;
+};
 
 export default function SettlementPage() {
   const router = useRouter()
@@ -31,110 +49,113 @@ export default function SettlementPage() {
   const [showSettlementGuideModal, setShowSettlementGuideModal] = useState(false)
   const [inviteCode, setInviteCode] = useState("")
   const [inviteCodeError, setInviteCodeError] = useState("")
-  const [remainingAttempts, setRemainingAttempts] = useState(5)
-  const [walletBalances, setWalletBalances] = useState<any[]>([])
   const [hasWallet, setHasWallet] = useState(false)
+  const [memberCounts, setMemberCounts] = useState<{ [groupId: number]: number }>({})
 
-  // Load wallet balances and groups from localStorage on mount
+  // Load groups from API on mount
   useEffect(() => {
-    // Check if user is logged in
-    const isLoggedIn = localStorage.getItem("isLoggedIn")
-    if (!isLoggedIn) {
-      router.push("/")
-      return
-    }
+    const fetchGroups = async () => {
+      try {
+        const token = await getValidToken();
+        
+        // Fetch my groups
+        const myGroupsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/settlement-groups/my`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          credentials: "include"
+        });
 
-    // Load wallet balances
-    const storedBalances = localStorage.getItem("walletBalances")
-    if (storedBalances) {
-      const parsedBalances = JSON.parse(storedBalances)
-      setWalletBalances(parsedBalances)
-      setHasWallet(parsedBalances.length > 0)
-    }
+        if (!myGroupsResponse.ok) {
+          const errorData = await myGroupsResponse.json().catch(() => ({}));
+          throw new Error(errorData.message || '내 그룹 목록을 불러오지 못했습니다.');
+        }
 
-    // Load settlement groups
-    const storedMyGroups = localStorage.getItem("mySettlementGroups")
-    if (storedMyGroups) {
-      setMyGroups(JSON.parse(storedMyGroups))
+        const myGroupsData = await myGroupsResponse.json();
+        console.log("My Groups API result:", myGroupsData.result);
+        setMyGroups(
+          (myGroupsData.result as SettlementGroup[]).map((group: SettlementGroup) => ({
+            ...group,
+            flagSrc: `/images/flags/${mapCurrencyToFlag(group.currencyCode || "KRW")}`
+          }))
+        );
+
+        // Fetch joined groups
+        const joinedGroupsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/settlement-groups/joined`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          credentials: "include"
+        });
+
+        if (!joinedGroupsResponse.ok) {
+          const errorData = await joinedGroupsResponse.json().catch(() => ({}));
+          throw new Error(errorData.message || '참여 그룹 목록을 불러오지 못했습니다.');
+        }
+
+        const joinedGroupsData = await joinedGroupsResponse.json();
+        console.log("Joined Groups API result:", joinedGroupsData.result);
+        setJoinedGroups(
+          (joinedGroupsData.result as SettlementGroup[])
+            .filter((group) => !!group)
+            .map((group: SettlementGroup) => ({
+              ...group,
+              flagSrc: `/images/flags/${mapCurrencyToFlag(group.currencyCode || "KRW")}`
+            }))
+        );
+
+        // Check if user has any wallet
+        const walletResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/wallet/all`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          credentials: "include"
+        });
+
+        if (!walletResponse.ok) {
+          const errorData = await walletResponse.json().catch(() => ({}));
+          throw new Error(errorData.message || '지갑 정보를 불러오지 못했습니다.');
+        }
+
+        const walletData = await walletResponse.json();
+        console.log("Wallet API result:", walletData.result);
+        setHasWallet(walletData.result.length > 0);
+
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        if (error instanceof Error && error.message === "No token found") {
+          router.push("/login");
+        } else {
+          alert(error instanceof Error ? error.message : '데이터를 불러오는 중 오류가 발생했습니다.');
+        }
+      }
+    };
+
+    // joinedGroupId 플래그가 있으면 joinedGroups를 강제로 새로고침
+    const joinedGroupId = localStorage.getItem("joinedGroupId");
+    if (joinedGroupId) {
+      fetchGroups();
+      localStorage.removeItem("joinedGroupId");
     } else {
-      // Set demo data if none exists
-      // "홍대 모임"을 "유럽 여행"으로 변경
-      const demoMyGroups: SettlementGroup[] = [
-        {
-          id: "group1",
-          name: "도쿄 여행",
-          isActive: true,
-          isOwner: true,
-          memberCount: 3,
-          maxMembers: 8,
-          currency: "JPY",
-          flagSrc: "/images/flags/japan.png",
-          inviteCode: "TOKYO2025",
-          inviteExpiry: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes from now
-          createdAt: new Date(),
-        },
-        {
-          id: "group2",
-          name: "인도 여행",
-          isActive: false,
-          isOwner: true,
-          memberCount: 5,
-          maxMembers: 10,
-          currency: "INR",
-          flagSrc: "/images/flags/india.png",
-          createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
-        },
-        {
-          id: "group5",
-          name: "유럽 여행",
-          isActive: false,
-          isOwner: true,
-          isSettling: true, // 정산 진행 중 상태
-          memberCount: 4,
-          maxMembers: 6,
-          currency: "EUR",
-          flagSrc: "/images/flags/eu.png",
-          createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
-        },
-      ]
-      setMyGroups(demoMyGroups)
-      localStorage.setItem("mySettlementGroups", JSON.stringify(demoMyGroups))
+      fetchGroups();
     }
+  }, [router]);
 
-    const storedJoinedGroups = localStorage.getItem("joinedSettlementGroups")
-    if (storedJoinedGroups) {
-      setJoinedGroups(JSON.parse(storedJoinedGroups))
-    } else {
-      // Set demo data if none exists
-      const demoJoinedGroups: SettlementGroup[] = [
-        {
-          id: "group3",
-          name: "미국 여행",
-          isActive: true,
-          isOwner: false,
-          memberCount: 4,
-          maxMembers: 5,
-          currency: "USD",
-          flagSrc: "/images/flags/usa.png",
-          createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
-        },
-        {
-          id: "group4",
-          name: "인도 여행",
-          isActive: false,
-          isOwner: false,
-          isSettling: true, // 정산 진행 중 상태
-          memberCount: 3,
-          maxMembers: 5,
-          currency: "INR",
-          flagSrc: "/images/flags/india.png",
-          createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
-        },
-      ]
-      setJoinedGroups(demoJoinedGroups)
-      localStorage.setItem("joinedSettlementGroups", JSON.stringify(demoJoinedGroups))
-    }
-  }, [router])
+  // 그룹 리스트 fetch 후, 각 그룹별 멤버 수 fetch
+  useEffect(() => {
+    if (joinedGroups.length === 0) return;
+    joinedGroups.forEach((group) => {
+      if (!group) return;
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/settlement-groups/${group.id}/member-count`)
+        .then((res) => res.json())
+        .then((data) => {
+          setMemberCounts((prev) => ({
+            ...prev,
+            [group.id]: data.result + 1,
+          }));
+        });
+    });
+  }, [joinedGroups]);
 
   const handleCreateGroup = () => {
     if (!hasWallet) {
@@ -152,39 +173,69 @@ export default function SettlementPage() {
     setShowJoinModal(true)
   }
 
-  const handleInviteCodeSubmit = () => {
+  const handleInviteCodeSubmit = async () => {
     if (!inviteCode.trim()) {
       setInviteCodeError("초대 코드를 입력해주세요.")
       return
     }
 
-    // Check if code matches any existing group
-    const matchingGroup = myGroups.find((group) => group.inviteCode === inviteCode.trim())
+    try {
+      const token = await getValidToken();
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/settlement-groups/verify-code`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+        body: JSON.stringify({ joinCode: inviteCode.trim() })
+      });
 
-    if (matchingGroup) {
-      // Navigate to the group
-      router.push(`/settlement/group/${matchingGroup.id}`)
+      if (!response.ok) {
+        const errorData = await response.json();
+        // SettlementErrorCode에 따른 안내 메시지 처리
+        let errorMessage = errorData.message || '초대 코드 검증에 실패했습니다.';
+        if (errorData.code === 'SETTLEMENT_001') {
+          errorMessage = '정산 그룹이 존재하지 않습니다.';
+        } else if (errorData.code === 'SETTLEMENT_013') {
+          errorMessage = '해당 정산 그룹에 접근할 수 없습니다.';
+        } else if (errorData.code === 'SETTLEMENT_015') {
+          errorMessage = '정산 그룹의 최대 참여 인원을 초과했습니다.';
+        }
+        setInviteCodeError(errorMessage);
+        return;
+      }
+
+      const result = await response.json();
+      console.log("verify join code API result:", result);
+      const verifyData = result.result || result.data || result;
+      if (!verifyData) {
+        throw new Error('Invalid response format');
+      }
+      
+      if (!verifyData.isValid) {
+        setInviteCodeError(verifyData.message || "초대 코드가 만료되었거나 유효하지 않습니다.");
+        return;
+      }
+
+      // 참여 성공 시 플래그 저장
+      if (verifyData.groupId) {
+        localStorage.setItem("joinedGroupId", String(verifyData.groupId));
+      }
+      router.push(`/settlement/group/${verifyData.groupId}`)
       setShowJoinModal(false)
       setInviteCode("")
       setInviteCodeError("")
-      setRemainingAttempts(5)
-    } else {
-      // Decrease remaining attempts
-      const newAttempts = remainingAttempts - 1
-      setRemainingAttempts(newAttempts)
-
-      if (newAttempts <= 0) {
-        setInviteCodeError("시도 횟수(5회)를 초과했습니다. 나중에 다시 시도해주세요.")
-        // Disable input for some time
-        setTimeout(() => {
-          setRemainingAttempts(5)
-          setInviteCodeError("")
-        }, 60000) // 1 minute timeout
+    } catch (error) {
+      console.error('Error joining group:', error);
+      if (error instanceof Error && error.message === "No token found") {
+        router.push("/login");
       } else {
-        setInviteCodeError(`유효하지 않은 초대 코드입니다. 남은 시도 횟수: ${newAttempts}회`)
+        alert(error instanceof Error ? error.message : '그룹 참여 중 오류가 발생했습니다.');
       }
     }
-  }
+  };
 
   // Navigation items with custom icons
   const navItems = [
@@ -227,7 +278,7 @@ export default function SettlementPage() {
 
           {myGroups.length > 0 ? (
             <div className="space-y-3">
-              {myGroups.map((group) => (
+              {myGroups.filter((group) => !!group).map((group) => (
                 <Link
                   key={group.id}
                   href={`/settlement/group/${group.id}`}
@@ -237,24 +288,25 @@ export default function SettlementPage() {
                     <div className="flex items-center">
                       <div className="relative mr-3 h-10 w-10 overflow-hidden rounded-full border border-gray-200">
                         <Image
-                          src={group.flagSrc || "/placeholder.svg"}
-                          alt={group.currency}
+                          src={group.flagSrc || "/images/flags/korea.png"}
+                          alt={group.currencyName}
                           width={40}
                           height={40}
+                          style={{height: 'auto', width: 40}}
                           className="object-cover"
                         />
                       </div>
                       <div>
                         <h3 className="font-medium">{group.name}</h3>
                         <p className="text-sm text-gray-500">
-                          멤버 {group.memberCount}/{group.maxMembers} •
-                          {group.isSettling ? "정산 진행 중" : group.isActive ? "활성" : "비활성"}
+                          멤버 {memberCounts[group.id] ?? (Array.isArray(group.members) ? group.members.length + 1 : 1)}/{group.maxMembers} •
+                          {group.settlementStatus === "IN_PROGRESS" ? "정산 진행 중" : group.isActive ? "활성" : "비활성"}
                         </p>
                       </div>
                     </div>
                     <div
                       className={`h-3 w-3 rounded-full ${
-                        group.isSettling ? "bg-red-500" : group.isActive ? "bg-green-500" : "bg-gray-300"
+                        group.settlementStatus === "IN_PROGRESS" ? "bg-red-500" : group.isActive ? "bg-green-500" : "bg-gray-300"
                       } shadow-sm`}
                     ></div>
                   </div>
@@ -282,7 +334,7 @@ export default function SettlementPage() {
 
           {joinedGroups.length > 0 ? (
             <div className="space-y-3">
-              {joinedGroups.map((group) => (
+              {joinedGroups.filter((group) => !!group).map((group) => (
                 <Link
                   key={group.id}
                   href={`/settlement/group/${group.id}`}
@@ -292,24 +344,25 @@ export default function SettlementPage() {
                     <div className="flex items-center">
                       <div className="relative mr-3 h-10 w-10 overflow-hidden rounded-full border border-gray-200">
                         <Image
-                          src={group.flagSrc || "/placeholder.svg"}
-                          alt={group.currency}
+                          src={group.flagSrc || "/images/flags/korea.png"}
+                          alt={group.currencyName}
                           width={40}
                           height={40}
+                          style={{height: 'auto', width: 40}}
                           className="object-cover"
                         />
                       </div>
                       <div>
                         <h3 className="font-medium">{group.name}</h3>
                         <p className="text-sm text-gray-500">
-                          멤버 {group.memberCount}/{group.maxMembers} •
-                          {group.isSettling ? "정산 진행 중" : group.isActive ? "활성" : "비활성"}
+                          멤버 {memberCounts[group.id] ?? (Array.isArray(group.members) ? group.members.length + 1 : 1)}/{group.maxMembers} •
+                          {group.settlementStatus === "IN_PROGRESS" ? "정산 진행 중" : group.isActive ? "활성" : "비활성"}
                         </p>
                       </div>
                     </div>
                     <div
                       className={`h-3 w-3 rounded-full ${
-                        group.isSettling ? "bg-red-500" : group.isActive ? "bg-green-500" : "bg-gray-300"
+                        group.settlementStatus === "IN_PROGRESS" ? "bg-red-500" : group.isActive ? "bg-green-500" : "bg-gray-300"
                       } shadow-sm`}
                     ></div>
                   </div>
@@ -331,13 +384,13 @@ export default function SettlementPage() {
         <div className="fixed bottom-20 right-4 flex flex-col space-y-3">
           <button
             onClick={handleJoinGroup}
-            className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-blue-500 shadow-lg transition-all hover:bg-blue-50"
+            className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-blue-500 shadow-lg transition-all hover:bg-blue-50 cursor-pointer"
           >
             <Share2 size={20} />
           </button>
           <button
             onClick={handleCreateGroup}
-            className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] text-white shadow-lg transition-all hover:shadow-xl"
+            className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] text-white shadow-lg transition-all hover:shadow-xl cursor-pointer"
           >
             <Plus size={24} />
           </button>
@@ -375,7 +428,7 @@ export default function SettlementPage() {
               ) : (
                 <div className="relative h-8 w-8">
                   <Image
-                    src={item.icon || "/placeholder.svg"}
+                    src={item.icon || "/images/flags/korea.png"}
                     alt={item.name}
                     width={32}
                     height={32}
@@ -519,13 +572,13 @@ export default function SettlementPage() {
 
                 <Link
                   href="/settlement/create"
-                  className="mb-4 block w-full rounded-lg bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] py-3 text-center font-medium text-white shadow-md"
+                  className="mb-4 block w-full rounded-lg bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] py-3 text-center font-medium text-white shadow-md cursor-pointer"
                 >
                   그룹 생성하기
                 </Link>
                 <button
                   onClick={() => setShowCreateModal(false)}
-                  className="w-full rounded-lg border border-gray-300 py-3 text-center font-medium text-gray-700"
+                  className="w-full rounded-lg border border-gray-300 py-3 text-center font-medium text-gray-700 cursor-pointer"
                 >
                   취소
                 </button>
@@ -564,7 +617,6 @@ export default function SettlementPage() {
               setShowJoinModal(false)
               setInviteCode("")
               setInviteCodeError("")
-              setRemainingAttempts(5)
             }}
           >
             <div className="fixed inset-0 flex items-center justify-center p-4">
@@ -593,15 +645,13 @@ export default function SettlementPage() {
                     className={`w-full rounded-lg border ${
                       inviteCodeError ? "border-red-500" : "border-gray-300"
                     } p-3 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500`}
-                    disabled={remainingAttempts <= 0}
                   />
                   {inviteCodeError && <p className="mt-1 text-sm text-red-500">{inviteCodeError}</p>}
                 </div>
 
                 <button
                   onClick={handleInviteCodeSubmit}
-                  disabled={remainingAttempts <= 0}
-                  className="mb-4 w-full rounded-lg bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] py-3 text-center font-medium text-white shadow-md disabled:bg-gray-300"
+                  className="mb-4 w-full rounded-lg bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] py-3 text-center font-medium text-white shadow-md disabled:bg-gray-300 cursor-pointer"
                 >
                   참여하기
                 </button>
@@ -610,9 +660,8 @@ export default function SettlementPage() {
                     setShowJoinModal(false)
                     setInviteCode("")
                     setInviteCodeError("")
-                    setRemainingAttempts(5)
                   }}
-                  className="w-full rounded-lg border border-gray-300 py-3 text-center font-medium text-gray-700"
+                  className="w-full rounded-lg border border-gray-300 py-3 text-center font-medium text-gray-700 cursor-pointer"
                 >
                   취소
                 </button>
