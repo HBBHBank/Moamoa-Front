@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import QrScanner from "qr-scanner"
+import { BrowserMultiFormatReader } from "@zxing/library"
 import { QrCode, RefreshCw } from "lucide-react"
 import { getValidToken } from "@/lib/auth"
 import { mapCurrencyToFlag } from "@/lib/utils"
@@ -119,44 +119,69 @@ export default function PaymentQRPage() {
 
   // QR 스캔 탭에서만 카메라 활성화
   useEffect(() => {
-    let qrScanner: QrScanner | null = null
+    let codeReader: BrowserMultiFormatReader | null = null
+    
     if (tab === "scan") {
-      QrScanner.hasCamera().then(hasCamera => {
-        if (!hasCamera) {
-          setQrError(true)
-        } else {
-          setQrError(false)
+      const startScanning = async () => {
+        try {
+          codeReader = new BrowserMultiFormatReader()
+          const videoInputDevices = await codeReader.listVideoInputDevices()
+          
+          if (videoInputDevices.length === 0) {
+            setQrError(true)
+            return
+          }
+          
+          // 후면 카메라 선택 (환경 카메라)
+          const selectedDeviceId = videoInputDevices.find(device => 
+            device.label.toLowerCase().includes('back') || 
+            device.label.toLowerCase().includes('rear') ||
+            device.label.toLowerCase().includes('environment')
+          )?.deviceId || videoInputDevices[0].deviceId
+          
           if (videoRef.current) {
-            qrScanner = new QrScanner(
+            await codeReader.decodeFromVideoDevice(
+              selectedDeviceId,
               videoRef.current,
-              async result => {
-                setQrScanResult(result.data)
-                // QR 코드 정보 조회
-                try {
-                  const token = await getValidToken();
-                  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/payments/qr-code/${result.data}`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                    credentials: "include"
-                  })
-                  const data = await res.json()
-                  setQrScanInfo(data.result)
-                } catch {
-                  setQrScanInfo(null)
+              (result, error) => {
+                if (result) {
+                  const qrText = result.getText()
+                  setQrScanResult(qrText)
+                  
+                  // QR 코드 정보 조회
+                  getValidToken().then(token => {
+                    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/payments/qr-code/${qrText}`, {
+                      headers: { Authorization: `Bearer ${token}` },
+                      credentials: "include"
+                    })
+                    .then(res => res.json())
+                    .then(data => setQrScanInfo(data.result))
+                    .catch(() => setQrScanInfo(null))
+                  }).catch(() => setQrScanInfo(null))
                 }
-              },
-              {
-                preferredCamera: "environment",
-                maxScansPerSecond: 5,
-                highlightScanRegion: true,
+                if (error && !(error.name === 'NotFoundException')) {
+                  console.error('QR scan error:', error)
+                }
               }
             )
-            qrScanner.start().catch(() => setQrError(true))
           }
+        } catch (error) {
+          console.error('QR Scanner initialization error:', error)
+          setQrError(true)
         }
-      })
+      }
+      
+      startScanning()
     }
+    
     return () => {
-      if (qrScanner) qrScanner.destroy()
+      if (codeReader) {
+        try {
+          codeReader.reset()
+        } catch (e) {
+          console.log('Scanner reset error:', e)
+        }
+      }
     }
   }, [tab])
 
