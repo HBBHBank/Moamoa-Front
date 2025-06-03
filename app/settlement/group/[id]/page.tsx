@@ -481,7 +481,6 @@ export default function SettlementGroupPage() {
   };
 
   const handleTransferToHost = async () => {
-    alert('클릭됨');
     console.log('송금 버튼 클릭됨', group, myUserId);
     // if (!group?.host || !myUserId) return;
     setIsTransferLoading(true);
