@@ -12,13 +12,13 @@ const nextConfig = {
       {
         protocol: 'http',
         hostname: 'localhost',
-        port: '8080',
+        port: '8070',
         pathname: '/static/**',
       },
       {
         protocol: 'https',
         hostname: 'localhost',
-        port: '8080',
+        port: '8070',
         pathname: '/static/**',
       },
       // 프로덕션 환경을 위한 설정 (필요시 수정)
