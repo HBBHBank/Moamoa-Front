@@ -317,13 +317,6 @@ export default function TransactionHistoryPage() {
 
   // --- Effects ---
   useEffect(() => {
-    // Initial login check and data fetch
-    const isLoggedIn = localStorage.getItem("isLoggedIn")
-    if (typeof window !== "undefined" && !isLoggedIn) {
-      router.push("/");
-      return;
-    }
-
     const initData = async () => {
       setIsLoading(true);
       await Promise.all([fetchWallets(), fetchTransactions()]);
@@ -604,8 +597,8 @@ export default function TransactionHistoryPage() {
               <div key={date} className="mb-4">
                 <div className="bg-gray-100 px-4 py-2 text-sm text-gray-500">{date}</div>
                 <div className="bg-white">
-                  {dateTransactions.map((transaction) => (
-                    <div key={transaction.id} className="border-b border-gray-100 px-4 py-4">
+                  {dateTransactions.map((transaction, idx) => (
+                    <div key={`${transaction.id}-${idx}`} className="border-b border-gray-100 px-4 py-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center">
                           <div className="mr-3 flex items-center">
@@ -643,6 +636,18 @@ export default function TransactionHistoryPage() {
                           {formatTimeForDisplay(transaction.transactedAt)}
                         </span>
                       </div>
+                      {/* InternalWalletTransaction일 경우에만 상대 지갑번호 표시 */}
+                      {[
+                        "QR_PAYMENT",
+                        "TRANSFER_OUT",
+                        "TRANSFER_IN",
+                        "SETTLEMENT_SEND",
+                        "SETTLEMENT_RECEIVE"
+                      ].includes(transaction.type) && transaction.counterWalletNumber && (
+                        <div className="mt-1 text-xs text-gray-500">
+                          상대 지갑번호: {transaction.counterWalletNumber}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
