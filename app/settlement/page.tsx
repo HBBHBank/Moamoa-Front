@@ -144,16 +144,32 @@ export default function SettlementPage() {
   // 그룹 리스트 fetch 후, 각 그룹별 멤버 수 fetch
   useEffect(() => {
     if (joinedGroups.length === 0) return;
-    joinedGroups.forEach((group) => {
+    joinedGroups.forEach(async (group) => {
       if (!group) return;
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/settlement-groups/${group.id}/member-count`)
-        .then((res) => res.json())
-        .then((data) => {
-          setMemberCounts((prev) => ({
-            ...prev,
-            [group.id]: data.result + 1,
-          }));
-        });
+      try {
+        const token = await getValidToken();
+        const res = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/v1/settlement-groups/${group.id}/member-count`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            credentials: "include",
+          }
+        );
+        if (!res.ok) {
+          // 에러 핸들링
+          console.error("멤버 수 API 에러:", res.status, await res.text());
+          return;
+        }
+        const data = await res.json();
+        setMemberCounts((prev) => ({
+          ...prev,
+          [group.id]: data.result + 1, // 방장 포함하려면 +1
+        }));
+      } catch (e) {
+        console.error("멤버 수 fetch 예외:", e);
+      }
     });
   }, [joinedGroups]);
 
@@ -355,7 +371,7 @@ export default function SettlementPage() {
                       <div>
                         <h3 className="font-medium">{group.name}</h3>
                         <p className="text-sm text-gray-500">
-                          멤버 {memberCounts[group.id] ?? (Array.isArray(group.members) ? group.members.length + 1 : 1)}/{group.maxMembers} •
+                          멤버 {memberCounts[group.id] ?? (Array.isArray(group.members) ? group.members.length : 1)}/{group.maxMembers} •
                           {group.settlementStatus === "IN_PROGRESS" ? "정산 진행 중" : group.isActive ? "활성" : "비활성"}
                         </p>
                       </div>

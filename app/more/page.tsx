@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { ChevronRight, MoreHorizontal, TrendingUp, BarChart3, HelpCircle, Info, FileText, CheckCircle } from "lucide-react"
+import { ChevronRight, MoreHorizontal, BarChart3, HelpCircle, Info, FileText, CheckCircle } from "lucide-react"
 import { useRouter, usePathname } from "next/navigation"
 import { getValidToken } from "@/lib/auth"
 
@@ -263,11 +263,6 @@ export default function MorePage() {
   ]
 
   const menuItems = [
-    {
-      icon: <TrendingUp className="w-6 h-6 text-gray-600" />,
-      title: "환전내역",
-      path: "/exchange/history"
-    },
     {
       icon: <BarChart3 className="w-6 h-6 text-gray-600" />,
       title: "환율정보",
