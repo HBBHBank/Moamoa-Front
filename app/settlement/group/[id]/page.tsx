@@ -67,17 +67,6 @@ type SettlementTransaction = {
   dividedAmount: number;
 }
 
-// TransactionResponseDto 타입 추가
-type TransactionResponseDto = {
-  id: number;
-  walletId: number;
-  amount: number;
-  type: string;
-  status: string;
-  createdAt: string;
-  description?: string;
-}
-
 // 송금 내역 타입 추가
 type Payment = {
   id: number;
@@ -97,6 +86,18 @@ interface MemberListItem {
   hasTransferred: boolean;
   color: string;
 }
+
+type SharedTransaction = {
+  id: number;
+  walletNumber: string;
+  counterWalletNumber: string;
+  currencyCode: string;
+  type: string;
+  status: string;
+  amount: number;
+  transactedAt: string;
+  external: boolean;
+};
 
 export default function SettlementGroupPage() {
   const router = useRouter()
@@ -119,7 +120,7 @@ export default function SettlementGroupPage() {
   const [showInviteGuideModal, setShowInviteGuideModal] = useState(false)
   const [isTransactionsLoading, setIsTransactionsLoading] = useState(false)
   const [transactionsError, setTransactionsError] = useState<string | null>(null)
-  const [sharedTransactions, setSharedTransactions] = useState<TransactionResponseDto[]>([])
+  const [sharedTransactions, setSharedTransactions] = useState<SharedTransaction[]>([])
   const [isSharedTxLoading, setIsSharedTxLoading] = useState(false)
   const [sharedTxError, setSharedTxError] = useState<string | null>(null)
 
@@ -202,6 +203,67 @@ export default function SettlementGroupPage() {
 
     fetchGroupData();
   }, [groupId, router]);
+
+  // Load shared transactions when group is loaded
+  useEffect(() => {
+    const fetchSharedTransactions = async () => {
+      if (!group || !group.id) return;
+
+      setIsSharedTxLoading(true);
+      setSharedTxError(null);
+
+      try {
+        const token = await getValidToken();
+        console.log('Fetching shared transactions with token:', token ? 'Token exists' : 'No token');
+        
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/v1/settlement-groups/${groupId}/shared-transactions`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            credentials: "include"
+          }
+        );
+
+        console.log('Shared transactions response status:', response.status);
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Shared transactions error:', errorData);
+          
+          if (response.status === 401) {
+            console.error('401 Unauthorized - Token may be expired or invalid');
+            router.push("/login");
+            return;
+          }
+          
+          if (response.status === 403) {
+            console.error('403 Forbidden - User does not have permission');
+            setSharedTxError('이 그룹의 공유 거래 내역을 볼 권한이 없습니다.');
+            return;
+          }
+          
+          throw new Error(errorData.message || '공유 거래 내역을 불러오지 못했습니다.');
+        }
+
+        const data = await response.json();
+        console.log('Shared transactions data:', data);
+        setSharedTransactions(data.result || []);
+      } catch (error) {
+        console.error('Shared transactions fetch error:', error);
+        if (error instanceof Error && error.message === "No token found") {
+          router.push("/login");
+        } else {
+          setSharedTxError(error instanceof Error ? error.message : '공유 거래 내역을 불러오지 못했습니다.');
+        }
+      } finally {
+        setIsSharedTxLoading(false);
+      }
+    };
+
+    fetchSharedTransactions();
+  }, [group?.id, groupId, router]);
 
   // 모달 관련 중복 스타일 코드를 제거하고 하나의 공통 스타일로 통합합니다.
   // 각 모달 컴포넌트에서 반복되는 style jsx global 태그를 하나로 통합합니다.
@@ -442,7 +504,8 @@ export default function SettlementGroupPage() {
   const handleStartSettlement = async () => {
     if (!group || !group.isOwner) return;
 
-    if (!Array.isArray(group.members) || group.members.length <= 1) {
+    // 방장 포함 총 멤버 수가 2명 미만이면 정산 시작 불가
+    if (memberList.length < 2) {
       setShowInviteGuideModal(true);
       return;
     }
@@ -477,12 +540,12 @@ export default function SettlementGroupPage() {
         isSettling: true,
         isActive: false,
         selectedMembers: result.result.selectedMembers,
-      }
+      };
 
-      setGroup(updatedGroup)
-      setSelectedMembers(result.result.selectedMembers)
-      setSettlementAmount(result.result.settlementAmount)
-      setShowSettlementModal(true)
+      setGroup(updatedGroup);
+      setSelectedMembers(result.result.selectedMembers);
+      setSettlementAmount(result.result.settlementAmount);
+      setShowSettlementModal(true);
     } catch (error) {
       if (error instanceof Error && error.message === "No token found") {
         router.push("/login");
@@ -490,7 +553,7 @@ export default function SettlementGroupPage() {
         alert(error instanceof Error ? error.message : '정산 시작 중 오류가 발생했습니다.');
       }
     }
-  }
+  };
 
   const handleCancelSettlement = async () => {
     if (!group || !group.isOwner) return
@@ -519,6 +582,7 @@ export default function SettlementGroupPage() {
         ...group,
         isSettling: false,
         isActive: true,
+        settlementStatus: "BEFORE",
         selectedMembers: [],
         members: group.members.map((member) => ({
           ...member,
@@ -528,6 +592,9 @@ export default function SettlementGroupPage() {
 
       setGroup(updatedGroup)
       setShowSettlementModal(false)
+      
+      // 성공 메시지 표시
+      alert("정산이 취소되었습니다.");
     } catch (error) {
       if (error instanceof Error && error.message === "No token found") {
         router.push("/login");
@@ -857,25 +924,29 @@ export default function SettlementGroupPage() {
             {showTransactionHistory && (
               <div className="mt-4 space-y-3">
                 {sharedTransactions.length > 0 ? (
-                  sharedTransactions.map((transaction) => (
+                  sharedTransactions.map((transaction: SharedTransaction) => (
                     <div key={transaction.id} className="rounded-lg border border-gray-200 p-3">
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="font-medium">
-                            {transaction.type === "SETTLEMENT_SEND" ? "송금" : "입금"} 거래
+                            {transaction.type === "TRANSFER_OUT"
+                              ? "출금"
+                              : transaction.type === "TRANSFER_IN"
+                              ? "입금"
+                              : transaction.type}
                           </p>
                           <p className="text-sm text-gray-500">
-                            {new Date(transaction.createdAt).toLocaleString()}
+                            {new Date(transaction.transactedAt).toLocaleString()}
                           </p>
                         </div>
-                        <p className={`font-bold ${transaction.type === "SETTLEMENT_SEND" ? "text-red-600" : "text-blue-600"}`}>
-                          {transaction.type === "SETTLEMENT_SEND" ? "-" : "+"}
-                          {getCurrencySymbol(group.currencyCode)} {transaction.amount.toLocaleString()}
+                        <p className={`font-bold ${transaction.type === "TRANSFER_OUT" ? "text-red-600" : "text-blue-600"}`}>
+                          {transaction.type === "TRANSFER_OUT" ? "-" : "+"}
+                          {transaction.amount.toLocaleString()} {transaction.currencyCode}
                         </p>
                       </div>
-                      {transaction.description && (
-                        <p className="mt-1 text-sm text-gray-500">{transaction.description}</p>
-                      )}
+                      <div className="text-xs text-gray-500 mt-1">
+                        내 지갑: {transaction.walletNumber} / 상대 지갑: {transaction.counterWalletNumber}
+                      </div>
                     </div>
                   ))
                 ) : (
@@ -897,15 +968,10 @@ export default function SettlementGroupPage() {
             <div className="border-b border-gray-200 p-4">
               <button
                 onClick={() => {
-                  // 방장의 지갑 번호 생성 (실제로는 DB에서 가져와야 함)
-                  const ownerWalletNumber = `9791-${group.currencyCode.charCodeAt(0)}${group.currencyCode.charCodeAt(1)}-${
-                    group.currencyCode.length > 2 ? group.currencyCode.charCodeAt(2) : "00"
-                  }1000-4618`
+                  // DB에서 방장 지갑번호와 이름을 가져옴
+                  const ownerWalletNumber = group.host.wallets && group.host.wallets.length > 0 ? group.host.wallets[0].walletNumber : ""
+                  const ownerName = group.host.name || "방장"
 
-                  // 방장 이름 (첫 번째 멤버 중 isHost가 true인 멤버)
-                  const ownerName = Array.isArray(group.members) ? group.members.find((m) => m.userId === group.host.id)?.name || "방장" : "방장"
-
-                  // URL 파라미터 인코딩 및 전달 방식 개선
                   router.push(
                     `/wallet/transfer?currency=${encodeURIComponent(group.currencyCode)}&walletNumber=${encodeURIComponent(ownerWalletNumber)}&recipientName=${encodeURIComponent(ownerName)}&skipFirstStep=true`,
                   )

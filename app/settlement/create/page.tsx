@@ -71,13 +71,6 @@ export default function CreateSettlementGroupPage() {
 
   // 컴포넌트 마운트 시 실행되는 useEffect 훅
   useEffect(() => {
-    // 사용자가 로그인했는지 확인
-    const isLoggedIn = localStorage.getItem("isLoggedIn")
-    if (!isLoggedIn) {
-      router.push("/") // 로그인하지 않았다면 홈 페이지로 리다이렉트
-      return
-    }
-
     // 로컬 스토리지에서 지갑 잔액 정보를 가져옴
     const storedBalances = localStorage.getItem("walletBalances")
     if (storedBalances) {

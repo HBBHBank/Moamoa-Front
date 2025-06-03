@@ -364,7 +364,7 @@ export default function ChargePage() {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            externalBankAccountNumber: newAccountNumber,
+            accountNumber: newAccountNumber,
             currencyCode: newCurrencyCode
           })
         }
