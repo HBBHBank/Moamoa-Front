@@ -343,7 +343,7 @@ export default function ChargePage() {
       return;
     }
     if (!newCurrencyCode) {
-      setVerificationError("통화코드를 입력해주세요.");
+      setVerificationError("통화코드를 선택해주세요.");
       return;
     }
     // OAuth 인증 여부 확인 (예: localStorage 플래그)
@@ -354,7 +354,7 @@ export default function ChargePage() {
     setIsVerifying(true);
     setVerificationError("");
     try {
-      const token = await getValidToken();
+      const token = await getValidToken(); // 모아모아 accessToken
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/v1/wallet/verification-code`,
         {
@@ -695,14 +695,20 @@ export default function ChargePage() {
               className="w-full border rounded-lg p-3 text-lg mb-4"
               maxLength={20}
             />
-            <input
-              type="text"
+            <select
               value={newCurrencyCode}
-              onChange={e => setNewCurrencyCode(e.target.value.toUpperCase())}
-              placeholder="통화코드 (예: KRW, USD)"
-              className="w-full border rounded-lg p-3 text-lg mb-4"
-              maxLength={10}
-            />
+              onChange={e => setNewCurrencyCode(e.target.value)}
+              className="w-full border rounded-lg p-3 text-lg mb-4 bg-white"
+            >
+              <option value="">통화코드 선택</option>
+              <option value="KRW">KRW (대한민국 원)</option>
+              <option value="USD">USD (미국 달러)</option>
+              <option value="EUR">EUR (유럽 유로)</option>
+              <option value="JPY">JPY (일본 엔)</option>
+              <option value="CNY">CNY (중국 위안)</option>
+              <option value="INR">INR (인도 루피)</option>
+              <option value="VND">VND (베트남 동)</option>
+            </select>
             <button
               onClick={handleRequestVerificationCode}
               disabled={isVerifying || !newAccountNumber || !newCurrencyCode}
