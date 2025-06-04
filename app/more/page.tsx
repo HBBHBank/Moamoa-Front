@@ -266,7 +266,7 @@ export default function MorePage() {
     {
       icon: <BarChart3 className="w-6 h-6 text-gray-600" />,
       title: "환율정보",
-      path: "/exchange/rates"
+      path: "/more/exchange"
     },
     {
       icon: <HelpCircle className="w-6 h-6 text-gray-600" />,
@@ -277,7 +277,7 @@ export default function MorePage() {
       icon: <Info className="w-6 h-6 text-gray-600" />,
       title: "버전정보",
       path: "/more/version",
-      rightContent: <span className="text-[#4DA9FF] text-sm font-medium">1.0.0</span>
+      rightContent: (<span className="text-[#4DA9FF] text-sm font-medium">1.0.0</span>)
     },
     {
       icon: <CheckCircle className="w-6 h-6 text-gray-600" />,
