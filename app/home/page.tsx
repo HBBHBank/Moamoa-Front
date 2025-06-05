@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { ChevronRight, TrendingUp, TrendingDown, MoreHorizontal } from "lucide-react"
+import { ChevronRight, MoreHorizontal } from "lucide-react"
 import { useRouter, usePathname } from "next/navigation"
 import { getValidToken } from "@/lib/auth"
 
@@ -28,9 +28,7 @@ interface ExchangeRate {
   code: string;
   flagSrc: string;
   rate: string;
-  change: string;
-  percentage: string;
-  isPositive: boolean;
+  registrationTime: string;
 }
 
 const mapCurrencyToFlag = (code: string) => {
@@ -98,6 +96,31 @@ const fetchWalletBalances = async (router: ReturnType<typeof useRouter>): Promis
   }
 }
 
+// 환율 국가 코드와 국기, 한글명 매핑
+const currencyMeta: Record<string, { country: string; flagSrc: string }> = {
+  JPY: { country: "일본", flagSrc: "/images/flags/japan.png" },
+  EUR: { country: "유럽", flagSrc: "/images/flags/eu.png" },
+  USD: { country: "미국", flagSrc: "/images/flags/usa.png" },
+  CNY: { country: "중국", flagSrc: "/images/flags/china.png" },
+  VND: { country: "베트남", flagSrc: "/images/flags/vietnam.png" },
+  INR: { country: "인도", flagSrc: "/images/flags/india.png" },
+}
+
+// 환율 변동 더미 데이터 (전날 대비)
+const dummyRateChange: Record<string, { diff: number; percent: number }> = {
+  JPY: { diff: -0.8, percent: -0.41 },
+  EUR: { diff: 0.5, percent: 0.32 },
+  USD: { diff: 1.2, percent: 0.09 },
+  CNY: { diff: -0.8, percent: -0.41 },
+  VND: { diff: 0.001, percent: 0.18 },
+  INR: { diff: 0.02, percent: 0.13 },
+};
+
+type ExchangeRateDataDto = {
+  currency: string;
+  registrationTime: string;
+  bankOfKoreaRate: string;
+};
 
 export default function HomePage() {
   const router = useRouter()
@@ -127,62 +150,44 @@ export default function HomePage() {
 
     checkAuth();
 
-    setExchangeRates([
-      {
-        country: "일본",
-        code: "JPY",
-        flagSrc: "/images/flags/japan.png",
-        rate: "961.32원",
-        change: "+2.3",
-        percentage: "0.24%",
-        isPositive: true,
-      },
-      {
-        country: "유럽",
-        code: "EUR",
-        flagSrc: "/images/flags/eu.png",
-        rate: "1,565.66원",
-        change: "+3.67",
-        percentage: "0.23%",
-        isPositive: true,
-      },
-      {
-        country: "미국",
-        code: "USD",
-        flagSrc: "/images/flags/usa.png",
-        rate: "1,393.0원",
-        change: "+2.9",
-        percentage: "0.21%",
-        isPositive: true,
-      },
-      {
-        country: "중국",
-        code: "CNY",
-        flagSrc: "/images/flags/china.png",
-        rate: "192.45원",
-        change: "-0.8",
-        percentage: "0.41%",
-        isPositive: false,
-      },
-      {
-        country: "베트남",
-        code: "VND",
-        flagSrc: "/images/flags/vietnam.png",
-        rate: "0.056원",
-        change: "+0.001",
-        percentage: "0.18%",
-        isPositive: true,
-      },
-      {
-        country: "인도",
-        code: "INR",
-        flagSrc: "/images/flags/india.png",
-        rate: "16.72원",
-        change: "+0.05",
-        percentage: "0.30%",
-        isPositive: true,
-      },
-    ])
+    // 환율 정보 API robust fetch (with token, logging, and correct structure)
+    const fetchRates = async () => {
+      try {
+        console.log('[환율] API URL:', process.env.NEXT_PUBLIC_API_URL);
+        const token = await getValidToken();
+        console.log('[환율] Token:', token ? token.substring(0, 20) + '...' : '없음');
+        const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/exchange/rates`;
+        console.log('[환율] Fetching:', apiUrl);
+        const res = await fetch(apiUrl, {
+          headers: { Authorization: `Bearer ${token}` },
+          credentials: "include"
+        });
+        console.log('[환율] Response status:', res.status);
+        const result = await res.json();
+        console.log('[환율] 최종 응답 구조 확인:', JSON.stringify(result, null, 2));
+        const data: ExchangeRateDataDto[] = Array.isArray(result.result?.data) ? result.result.data : [];
+        if (!data.length) {
+          console.warn('[환율] result.result.data가 비어있거나 배열이 아님:', result.result?.data);
+        } else {
+          console.log('[환율] 사용된 경로: result.result.data');
+        }
+        const rates: ExchangeRate[] = data.map((item) => {
+          const meta = currencyMeta[item.currency] || { country: item.currency, flagSrc: "" };
+          return {
+            country: meta.country,
+            code: item.currency,
+            flagSrc: meta.flagSrc,
+            rate: item.bankOfKoreaRate,
+            registrationTime: item.registrationTime,
+          };
+        });
+        setExchangeRates(rates);
+      } catch (err) {
+        console.error('[환율] API 호출 실패:', err);
+        setExchangeRates([]);
+      }
+    };
+    fetchRates();
 
     const interval = setInterval(() => {
       if (carouselRef.current && !isScrolling) {
@@ -202,7 +207,7 @@ export default function HomePage() {
     }, 30)
 
     return () => clearInterval(interval)
-  }, [router, isScrolling, exchangeRates.length])
+  }, [router, isScrolling])
 
   const handleCharge = () => {
     router.push("/wallet/charge")
@@ -385,29 +390,27 @@ export default function HomePage() {
             {[...exchangeRates, ...exchangeRates].map((rate, index) => (
               <div
                 key={index}
-                className="group min-w-[150px] rounded-lg bg-white p-4 shadow-sm transition-all duration-300 hover:shadow-md"
+                className="group min-w-[160px] max-w-[180px] rounded-xl bg-white p-5 shadow hover:shadow-md transition-all duration-200 flex flex-col items-center justify-between relative overflow-hidden animate-fade-in-scale cursor-pointer border border-gray-100 active:scale-95"
+                style={{ minHeight: 130, animationDelay: `${index * 80}ms` }}
+                onClick={() => window.location.href = '/exchange'}
               >
-                <div className="mb-3 flex items-center space-x-2">
-                  <div className="relative h-8 w-8 overflow-hidden rounded-full border border-gray-100 shadow-sm transition-all duration-300 group-hover:shadow-md">
-                    <Image src={rate.flagSrc || "/images/flags/korea.png"} alt={rate.country} width={32} height={32} />
+                {/* Flag and country */}
+                <div className="mb-3 flex flex-col items-center z-10">
+                  <div className="relative h-10 w-10 mb-1 overflow-hidden rounded-full border border-gray-200 shadow-sm">
+                    <Image src={rate.flagSrc || '/images/flags/korea.png'} alt={rate.country} width={40} height={40} />
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">{rate.country}</p>
-                    <p className="text-xs text-gray-500">{rate.code}</p>
-                  </div>
+                  <span className="text-sm font-semibold text-gray-900 tracking-tight">{rate.country}</span>
+                  <span className="text-xs font-medium text-gray-400 mt-0.5">{rate.code}</span>
                 </div>
-                <p className="text-lg font-bold text-gray-800">{rate.rate}</p>
-                <div
-                  className={`mt-1 flex items-center ${
-                    rate.isPositive ? "text-green-500" : "text-red-500"
-                  } text-xs font-medium`}
-                >
-                  {rate.isPositive ? (
-                    <TrendingUp className="mr-1 h-3 w-3" />
-                  ) : (
-                    <TrendingDown className="mr-1 h-3 w-3" />
+                {/* Rate info */}
+                <div className="flex flex-col items-center z-10">
+                  <span className="text-lg font-bold text-gray-700">{rate.rate}<span className="text-base font-medium ml-0.5 text-gray-400">원</span></span>
+                  {/* 전날 대비 변동 더미데이터 */}
+                  {dummyRateChange[rate.code] && (
+                    <span className={`mt-1 text-xs font-medium ${dummyRateChange[rate.code].diff >= 0 ? 'text-green-500' : 'text-red-400'}`}>
+                      ~ {dummyRateChange[rate.code].diff >= 0 ? '+' : ''}{dummyRateChange[rate.code].diff} ({dummyRateChange[rate.code].percent >= 0 ? '+' : ''}{dummyRateChange[rate.code].percent}%)
+                    </span>
                   )}
-                  {rate.change} ({rate.percentage})
                 </div>
               </div>
             ))}
@@ -481,6 +484,18 @@ export default function HomePage() {
           </div>
         </div>
       )}
+
+      {/* Animation keyframes for fade-in-scale */}
+      <style jsx>{`
+        @keyframes fade-in-scale {
+          0% { opacity: 0; transform: scale(0.96) translateY(24px); }
+          60% { opacity: 0.7; transform: scale(1.01) translateY(-4px); }
+          100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .animate-fade-in-scale {
+          animation: fade-in-scale 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+      `}</style>
     </div>
   )
 }
