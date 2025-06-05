@@ -711,7 +711,7 @@ export default function ProfileEditPage() {
       </header>
 
       {/* Content */}
-      <div className="flex-1 px-4 py-6 space-y-6">
+      <div className="flex-1 px-4 py-6 space-y-6 animate-fade-in-scale">
         {/* Profile Info */}
         <div className="bg-white rounded-xl p-5 shadow-sm">
           <div className="flex items-center space-x-4 mb-4">
@@ -1014,6 +1014,18 @@ export default function ProfileEditPage() {
           </div>
         </div>
       )}
+
+      {/* Animation keyframes for fade-in-scale */}
+      <style jsx>{`
+        @keyframes fade-in-scale {
+          0% { opacity: 0; transform: scale(0.96) translateY(24px); }
+          60% { opacity: 0.7; transform: scale(1.01) translateY(-4px); }
+          100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .animate-fade-in-scale {
+          animation: fade-in-scale 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+        }
+      `}</style>
     </div>
   )
 } 
