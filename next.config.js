@@ -21,7 +21,6 @@ const nextConfig = {
         port: '8070',
         pathname: '/static/**',
       },
-      // 프로덕션 환경을 위한 설정 (필요시 수정)
       {
         protocol: 'https',
         hostname: 'your-api-domain.com',
@@ -31,7 +30,6 @@ const nextConfig = {
   },
   async redirects() {
     return [
-      // Chrome DevTools 관련 404 에러 방지
       {
         source: '/.well-known/appspecific/:path*',
         destination: '/api/not-found',
@@ -39,6 +37,26 @@ const nextConfig = {
       },
     ];
   },
+
+  // ✅ /oauth/authorize는 정적 생성하지 않음
+  experimental: {
+    // App Router에서 동적 렌더링 지원을 명시적으로 활성화
+    serverActions: true,
+  },
+  // ✅ 특정 경로에 대해 동적 처리 강제
+  async headers() {
+    return [
+      {
+        source: '/oauth/authorize',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-store', // 프리렌더 방지
+          },
+        ],
+      },
+    ];
+  },
 }
 
-module.exports = nextConfig 
+module.exports = nextConfig;
