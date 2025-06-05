@@ -64,6 +64,7 @@ export default function ChargePage() {
   const [verificationCode, setVerificationCode] = useState<string>("")
   const [verificationError, setVerificationError] = useState<string>("")
   const [isVerifying, setIsVerifying] = useState(false)
+  const [showCurrencyModal, setShowCurrencyModal] = useState(false)
 
   // 통화 목록
   const currencies: CurrencyInfo[] = [
@@ -597,7 +598,8 @@ export default function ChargePage() {
                 </>
               ) : (
                 <span className="text-gray-500 w-full text-center">
-                  출금할 수 있는 계좌가 없습니다. 계좌를 추가해주세요.
+                  출금할 수 있는 계좌가 없습니다.
+                  계좌를 추가해주세요.
                 </span>
               )}
             </button>
@@ -695,20 +697,49 @@ export default function ChargePage() {
               className="w-full border rounded-lg p-3 text-lg mb-4"
               maxLength={20}
             />
-            <select
-              value={newCurrencyCode}
-              onChange={e => setNewCurrencyCode(e.target.value)}
-              className="w-full border rounded-lg p-3 text-lg mb-4 bg-white"
+            <button
+              type="button"
+              className="w-full border rounded-lg p-3 text-lg mb-4 bg-white flex items-center justify-between"
+              onClick={() => setShowCurrencyModal(true)}
             >
-              <option value="">통화코드 선택</option>
-              <option value="KRW">KRW (대한민국 원)</option>
-              <option value="USD">USD (미국 달러)</option>
-              <option value="EUR">EUR (유럽 유로)</option>
-              <option value="JPY">JPY (일본 엔)</option>
-              <option value="CNY">CNY (중국 위안)</option>
-              <option value="INR">INR (인도 루피)</option>
-              <option value="VND">VND (베트남 동)</option>
-            </select>
+              {newCurrencyCode
+                ? (
+                  <span className="flex items-center">
+                    <img
+                      src={currencies.find(c => c.code === newCurrencyCode)?.flagSrc}
+                      alt={newCurrencyCode}
+                      className="w-6 h-6 mr-2"
+                    />
+                    {currencies.find(c => c.code === newCurrencyCode)?.country} ({newCurrencyCode})
+                  </span>
+                )
+                : <span className="text-gray-400">통화코드 선택</span>
+              }
+              <span className="text-gray-400 ml-2">▼</span>
+            </button>
+            {showCurrencyModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowCurrencyModal(false)}>
+                <div className="bg-white rounded-xl p-6 max-w-xs w-full shadow-lg" onClick={e => e.stopPropagation()}>
+                  <h3 className="text-lg font-semibold mb-4">통화 선택</h3>
+                  <div className="space-y-2 max-h-72 overflow-y-auto">
+                    {currencies.map(currency => (
+                      <button
+                        key={currency.code}
+                        type="button"
+                        className={`flex items-center w-full px-4 py-3 rounded-lg border transition-all ${newCurrencyCode === currency.code ? 'bg-blue-50 border-blue-400' : 'bg-white border-gray-200 hover:bg-gray-50'}`}
+                        onClick={() => { setNewCurrencyCode(currency.code); setShowCurrencyModal(false); }}
+                      >
+                        <img src={currency.flagSrc} alt={currency.code} className="w-6 h-6 mr-3" />
+                        <span className="font-semibold">{currency.code}</span>
+                        <span className="ml-2 text-gray-600">{currency.country}</span>
+                        <span className="ml-auto text-xs text-gray-400">단위: {currency.chargeUnit.toLocaleString()} {currency.code}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <button className="mt-4 w-full py-2 rounded bg-gray-200 text-gray-700 font-medium" onClick={() => setShowCurrencyModal(false)}>취소</button>
+                </div>
+              </div>
+            )}
             <button
               onClick={handleRequestVerificationCode}
               disabled={isVerifying || !newAccountNumber || !newCurrencyCode}

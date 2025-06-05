@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import AccountDropdown from "./AccountDropdown";
 
 // Dto 기반 계좌 타입
 type VerificationAccountDataDto = {
@@ -171,60 +172,37 @@ export default function HwanbiAccountExchangePage() {
         <div className="bg-white rounded-2xl shadow-lg p-8 space-y-6 max-w-lg w-full border border-gray-100">
           {/* 계좌 선택 - 한 줄, 카드형, 가운데 →, 드롭다운은 아이콘만 */}
           <div className="flex flex-col items-center space-y-4 min-w-0 pb-2">
-            {/* From 계좌 */}
+            {/* From 계좌 - 국기+계좌번호만(하이픈 없이) */}
             <div className="flex items-center border border-gray-300 rounded-xl px-4 py-3 bg-white shadow-sm w-full max-w-full">
               {fromAcc && currencyMeta[fromAcc.currencyCode]?.flag && (
                 <img src={currencyMeta[fromAcc.currencyCode].flag} alt={fromAcc.currencyCode} className="w-8 h-8 mr-3" />
               )}
               <div className="flex flex-col min-w-0 flex-1">
                 <div className="flex items-center min-w-0">
-                  <span className="font-semibold text-lg text-gray-800 truncate">{fromAcc?.currencyCode}</span>
-                  <span className="ml-2 text-gray-600 truncate">- {currencyMeta[fromAcc?.currencyCode || '']?.name}</span>
-                  <span className="ml-2 text-gray-500 font-mono truncate">({fromAcc?.accountNumber})</span>
+                  <span className="text-gray-700 font-mono text-lg">{fromAcc?.accountNumber?.replace(/-/g, "")}</span>
                 </div>
-              </div>
-              <div className="relative w-full">
-                <select
-                  className="block w-full bg-white border border-gray-300 rounded-lg py-2 pl-4 pr-10 text-lg font-semibold text-gray-900 appearance-none focus:outline-none focus:ring-2 focus:ring-[#4DA9FF] focus:border-[#4DA9FF] cursor-pointer"
-                  value={fromAccount}
-                  onChange={e => setFromAccount(e.target.value)}
-                >
-                  {accounts.map(acc => (
-                    <option key={acc.accountNumber} value={acc.accountNumber}>
-                      {acc.currencyCode} - {currencyMeta[acc.currencyCode]?.name || acc.currencyCode} ({acc.accountNumber})
-                    </option>
-                  ))}
-                </select>
-                <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg">▼</span>
               </div>
             </div>
             {/* Arrow */}
             <span className="my-2 text-3xl font-bold text-gray-500">↓</span>
-            {/* To 계좌 */}
+            {/* To 계좌 - 국기+계좌번호만, 통화 코드 없이 */}
             <div className="flex items-center border border-gray-300 rounded-xl px-4 py-3 bg-white shadow-sm w-full max-w-full">
               {toAcc && currencyMeta[toAcc.currencyCode]?.flag && (
                 <img src={currencyMeta[toAcc.currencyCode].flag} alt={toAcc.currencyCode} className="w-8 h-8 mr-3" />
               )}
               <div className="flex flex-col min-w-0 flex-1">
                 <div className="flex items-center min-w-0">
-                  <span className="font-semibold text-lg text-gray-800 truncate">{toAcc?.currencyCode}</span>
-                  <span className="ml-2 text-gray-600 truncate">- {currencyMeta[toAcc?.currencyCode || '']?.name}</span>
                   <span className="ml-2 text-gray-500 font-mono truncate">({toAcc?.accountNumber})</span>
                 </div>
               </div>
               <div className="relative w-full">
-                <select
-                  className="block w-full bg-white border border-gray-300 rounded-lg py-2 pl-4 pr-10 text-lg font-semibold text-gray-900 appearance-none focus:outline-none focus:ring-2 focus:ring-[#4DA9FF] focus:border-[#4DA9FF] cursor-pointer"
+                <AccountDropdown
+                  accounts={accounts.filter(acc => acc.currencyCode !== 'KRW')}
                   value={toAccount}
-                  onChange={e => setToAccount(e.target.value)}
-                >
-                  {accounts.map(acc => (
-                    <option key={acc.accountNumber} value={acc.accountNumber}>
-                      {acc.currencyCode} - {currencyMeta[acc.currencyCode]?.name || acc.currencyCode} ({acc.accountNumber})
-                    </option>
-                  ))}
-                </select>
-                <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg">▼</span>
+                  onChange={setToAccount}
+                  currencyMeta={currencyMeta}
+                  onlyCode={true}
+                />
               </div>
             </div>
           </div>

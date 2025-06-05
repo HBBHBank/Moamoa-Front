@@ -45,9 +45,9 @@ export default function PaymentMainPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* 홈화면과 동일한 헤더, 중앙에 타이틀 */}
-      <header className="relative flex items-center justify-center bg-white p-4 shadow-sm">
+      <header className="relative flex items-center justify-center bg-white p-4 shadow-sm w-full">
         <button
-          className="absolute left-4 top-1/2 -translate-y-1/2 p-1 cursor-pointer"
+          className="absolute left-4 top-1/2 -translate-y-1/2 p-1 cursor-pointer hover:bg-gray-100 rounded-full transition"
           onClick={() => router.back()}
         >
           <svg width="24" height="24" fill="none" stroke="#222" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
@@ -56,24 +56,24 @@ export default function PaymentMainPage() {
       </header>
 
       {/* 사용 가능 금액 및 버튼 - 카드 스타일 */}
-      <div className="px-4 pt-6">
+      <div className="px-4 pt-6 mt-4">
         <div className="bg-white rounded-xl shadow-md p-5 flex items-center justify-between">
           <div className="flex flex-col gap-1">
             <span className="text-xs text-gray-400 mb-1">사용 가능 금액</span>
             <div className="flex items-end gap-2">
-              <span className="text-4xl font-extrabold text-gray-800 tracking-tight">{selectedWallet ? selectedWallet.balance.toLocaleString() : '-'}</span>
-              <span className="ml-1 text-xl font-bold text-gray-500">{selectedWallet ? selectedWallet.currencyCode : ''}</span>
+              <span className="text-2xl font-extrabold text-gray-800 tracking-tight">{selectedWallet ? selectedWallet.balance.toLocaleString() : '-'}</span>
+              <span className="ml-1 text-sm font-bold text-gray-500">{selectedWallet ? selectedWallet.currencyCode : ''}</span>
             </div>
           </div>
-          <div className="flex gap-2 ml-4">
+          <div className="flex gap-1 ml-2">
             <button
-              className="rounded-full border border-[#2566CF] text-[#2566CF] text-sm px-5 py-2 font-semibold shadow-sm transition-all duration-150 hover:bg-[#f5faff] active:scale-95 active:shadow-inner cursor-pointer"
+              className="h-10 min-w-[80px] rounded-full border border-[#2566CF] text-[#2566CF] text-sm px-4 font-semibold shadow-sm transition-all duration-150 hover:bg-[#f5faff] active:scale-95 active:shadow-inner cursor-pointer"
               onClick={() => setWalletModal(true)}
             >
               통화선택
             </button>
             <button
-              className="rounded-full border border-[#2566CF] text-[#2566CF] text-sm px-5 py-2 font-semibold shadow-sm transition-all duration-150 hover:bg-[#f5faff] active:scale-95 active:shadow-inner cursor-pointer"
+              className="h-10 min-w-[80px] rounded-full border border-[#2566CF] text-[#2566CF] text-sm px-4 font-semibold shadow-sm transition-all duration-150 hover:bg-[#f5faff] active:scale-95 active:shadow-inner cursor-pointer"
               onClick={() => router.push("/wallet/charge")}
             >
               충전하기
@@ -90,8 +90,8 @@ export default function PaymentMainPage() {
         >
           {/* 왼쪽: 텍스트 + QR 이미지 */}
           <div className="flex-1 flex flex-col items-start justify-center h-full">
-            <div className="text-white text-2xl font-bold mb-2 drop-shadow">QR 현장 결제하기</div>
-            <div className="text-white text-base opacity-80 mb-6 drop-shadow">모아모아 지갑에서 간단하게 결제할 수 있어요</div>
+            <div className="text-white text-lg font-bold mb-2 drop-shadow">QR 현장 결제하기</div>
+            <div className="text-white text-sm opacity-80 mb-6 drop-shadow">모아모아 지갑에서 간단하게 결제할 수 있어요</div>
             <div className="mt-auto">
               {/* Lucide ScanLine 스타일 QR+프레임 아이콘 SVG */}
               <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2" className="opacity-40 drop-shadow">

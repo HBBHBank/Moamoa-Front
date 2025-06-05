@@ -340,14 +340,14 @@ export default function PaymentQRPage() {
                     <Image src={`/images/flags/${mapCurrencyToFlag(selectedWallet.currencyCode)}`} alt={selectedWallet.currencyCode} width={32} height={32} className="rounded-full" />
                     <div className="flex flex-col">
                       <span className="text-xs text-gray-400 mb-0.5">결제할 지갑</span>
-                      <span className="text-xl font-bold text-gray-900">{selectedWallet.balance.toLocaleString()} {selectedWallet.currencyCode}</span>
+                      <span className="text-lg font-bold text-gray-900">{selectedWallet.balance.toLocaleString()} <span className='text-xs font-bold text-gray-500'>{selectedWallet.currencyCode}</span></span>
                     </div>
                   </>
                 )}
               </div>
               <div className="flex gap-2">
-                <button className="rounded-full bg-[#f5f5f5] text-gray-400 text-sm px-4 py-2 font-semibold hover:bg-[#e6eaf0] transition cursor-pointer" onClick={() => setWalletModal(true)}>지갑변경</button>
-                <button className="rounded-full bg-[#f5f5f5] text-gray-400 text-sm px-4 py-2 font-semibold hover:bg-[#e6eaf0] transition cursor-pointer" onClick={() => router.push("/wallet/charge")}>충전하기</button>
+                <button className="rounded-full bg-[#f5f5f5] text-gray-400 text-xs px-3 py-1.5 font-semibold hover:bg-[#e6eaf0] transition cursor-pointer" onClick={() => setWalletModal(true)}>지갑변경</button>
+                <button className="rounded-full bg-[#f5f5f5] text-gray-400 text-xs px-3 py-1.5 font-semibold hover:bg-[#e6eaf0] transition cursor-pointer" onClick={() => router.push("/wallet/charge")}>충전하기</button>
               </div>
             </div>
           </div>
@@ -402,14 +402,14 @@ export default function PaymentQRPage() {
                     <Image src={`/images/flags/${mapCurrencyToFlag(selectedWallet.currencyCode)}`} alt={selectedWallet.currencyCode} width={32} height={32} className="rounded-full" />
                     <div className="flex flex-col">
                       <span className="text-xs text-gray-400 mb-0.5">결제할 지갑</span>
-                      <span className="text-xl font-bold text-gray-900">{selectedWallet.balance.toLocaleString()} {selectedWallet.currencyCode}</span>
+                      <span className="text-lg font-bold text-gray-900">{selectedWallet.balance.toLocaleString()} <span className='text-xs font-bold text-gray-500'>{selectedWallet.currencyCode}</span></span>
                     </div>
                   </>
                 )}
               </div>
               <div className="flex gap-2">
-                <button className="rounded-full bg-[#f5f5f5] text-gray-400 text-sm px-4 py-2 font-semibold hover:bg-[#e6eaf0] transition cursor-pointer" onClick={() => setWalletModal(true)}>지갑변경</button>
-                <button className="rounded-full bg-[#f5f5f5] text-gray-400 text-sm px-4 py-2 font-semibold hover:bg-[#e6eaf0] transition cursor-pointer" onClick={() => router.push("/wallet/charge")}>충전하기</button>
+                <button className="rounded-full bg-[#f5f5f5] text-gray-400 text-xs px-3 py-1.5 font-semibold hover:bg-[#e6eaf0] transition cursor-pointer" onClick={() => setWalletModal(true)}>지갑변경</button>
+                <button className="rounded-full bg-[#f5f5f5] text-gray-400 text-xs px-3 py-1.5 font-semibold hover:bg-[#e6eaf0] transition cursor-pointer" onClick={() => router.push("/wallet/charge")}>충전하기</button>
               </div>
             </div>
           </div>
@@ -419,59 +419,52 @@ export default function PaymentQRPage() {
       {/* 지갑 선택 모달 */}
       {walletModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-          onClick={() => setWalletModal(false)}
+          className="bg-white rounded-3xl w-80 max-w-full p-7 shadow-2xl relative"
+          onClick={e => e.stopPropagation()}
         >
-          <div
-            className="bg-white rounded-3xl w-80 max-w-full p-7 shadow-2xl relative"
-            onClick={e => e.stopPropagation()}
-          >
-            <button onClick={() => setWalletModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 cursor-pointer">
-              <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="6" y1="18" x2="18" y2="6"/></svg>
-            </button>
-            <div className="font-semibold text-gray-800 mb-6 text-lg text-center">지갑 선택</div>
-            <div className="space-y-2">
-              {wallets.map(w => (
-                <button
-                  key={w.walletId}
-                  className={`flex items-center w-full p-3 rounded-xl border transition-all duration-150 shadow-sm hover:shadow-md active:scale-95 active:shadow-inner cursor-pointer ${selectedWallet && selectedWallet.walletId === w.walletId ? "border-[#2566CF] bg-[#F3F6FA] shadow-lg" : "border-gray-100 bg-white"}`}
-                  onClick={() => { setSelectedWallet(w); setWalletModal(false); }}
-                >
-                  <Image src={`/images/flags/${mapCurrencyToFlag(w.currencyCode)}`} alt={w.currencyCode} width={28} height={28} className="rounded-full mr-3" />
-                  <div className="flex-1 text-left">
-                    <div className="font-medium text-gray-800">{w.currencyName}</div>
-                    <div className="text-xs text-gray-500">{w.balance.toLocaleString()} {w.currencyCode}</div>
-                  </div>
-                  {selectedWallet && selectedWallet.walletId === w.walletId && (
-                    <svg width="20" height="20" fill="none" stroke="#2566CF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="5 11 9 15 15 7"/></svg>
-                  )}
-                </button>
-              ))}
-            </div>
+          <button onClick={() => setWalletModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 cursor-pointer">
+            <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="6" y1="18" x2="18" y2="6"/></svg>
+          </button>
+          <div className="font-semibold text-gray-800 mb-6 text-lg text-center">지갑 선택</div>
+          <div className="space-y-2">
+            {wallets.map(w => (
+              <button
+                key={w.walletId}
+                className={`flex items-center w-full p-3 rounded-xl border transition-all duration-150 shadow-sm hover:shadow-md active:scale-95 active:shadow-inner cursor-pointer ${selectedWallet && selectedWallet.walletId === w.walletId ? "border-[#2566CF] bg-[#F3F6FA] shadow-lg" : "border-gray-100 bg-white"}`}
+                onClick={() => { setSelectedWallet(w); setWalletModal(false); }}
+              >
+                <Image src={`/images/flags/${mapCurrencyToFlag(w.currencyCode)}`} alt={w.currencyCode} width={28} height={28} className="rounded-full mr-3" />
+                <div className="flex-1 text-left">
+                  <div className="font-medium text-gray-800">{w.currencyName}</div>
+                  <div className="text-xs text-gray-500">{w.balance.toLocaleString()} {w.currencyCode}</div>
+                </div>
+                {selectedWallet && selectedWallet.walletId === w.walletId && (
+                  <svg width="20" height="20" fill="none" stroke="#2566CF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="5 11 9 15 15 7"/></svg>
+                )}
+              </button>
+            ))}
           </div>
         </div>
       )}
 
       {/* 안내 모달 */}
       {infoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setInfoModal(false)}>
-          <div className="bg-white rounded-3xl w-[90vw] max-w-md p-7 shadow-2xl relative" onClick={e => e.stopPropagation()}>
-            <button onClick={() => setInfoModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 cursor-pointer">
-              <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="6" y1="18" x2="18" y2="6"/></svg>
-            </button>
-            <div className="font-bold text-lg text-gray-800 mb-4">QR 결제 안내</div>
-            <div className="text-gray-700 text-base mb-4 whitespace-pre-line">
-              <span className="font-semibold text-[#2566CF]">QR 생성</span>{"\n"}
-              상대가 나의 QR 코드를 스캔하고, 상대가 금액을 입력하면 내가 선택한 지갑으로 해당 금액만큼 포인트가 입금됩니다.{"\n\n"}
-              <span className="font-semibold text-[#2566CF]">QR 스캔</span>{"\n"}
-              내가 결제할 상대의 QR 코드를 스캔해주세요! 결제할 금액을 입력하면, 해당 금액만큼의 돈이 상대에게 입금됩니다.
-            </div>
-            <div className="font-semibold text-[#2566CF] mb-2">명심하세요!</div>
-            <ul className="text-gray-600 text-sm list-disc pl-5 space-y-1">
-              <li>QR 결제는 모아모아 서비스 이용자끼리만 가능합니다.</li>
-              <li>QR 결제는 같은 통화끼리만 이용이 가능합니다.</li>
-            </ul>
+        <div className="bg-white rounded-3xl w-[90vw] max-w-md p-7 shadow-2xl relative" onClick={e => e.stopPropagation()}>
+          <button onClick={() => setInfoModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 cursor-pointer">
+            <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="6" y1="18" x2="18" y2="6"/></svg>
+          </button>
+          <div className="font-bold text-lg text-gray-800 mb-4">QR 결제 안내</div>
+          <div className="text-gray-700 text-base mb-4 whitespace-pre-line">
+            <span className="font-semibold text-[#2566CF]">QR 생성</span>{"\n"}
+            상대가 나의 QR 코드를 스캔하고, 상대가 금액을 입력하면 내가 선택한 지갑으로 해당 금액만큼 포인트가 입금됩니다.{"\n\n"}
+            <span className="font-semibold text-[#2566CF]">QR 스캔</span>{"\n"}
+            내가 결제할 상대의 QR 코드를 스캔해주세요! 결제할 금액을 입력하면, 해당 금액만큼의 돈이 상대에게 입금됩니다.
           </div>
+          <div className="font-semibold text-[#2566CF] mb-2">명심하세요!</div>
+          <ul className="text-gray-600 text-sm list-disc pl-5 space-y-1">
+            <li>QR 결제는 모아모아 서비스 이용자끼리만 가능합니다.</li>
+            <li>QR 결제는 같은 통화끼리만 이용이 가능합니다.</li>
+          </ul>
         </div>
       )}
     </div>

@@ -95,6 +95,9 @@ export default function ProfileEditPage() {
   
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // 모달 state 추가
+  const [modal, setModal] = useState<{ open: boolean, message: string, onClose?: () => void }>({ open: false, message: "" })
+
   // 에러 메시지 매핑 함수
   const getErrorMessage = (errorData: { errorCode?: string; message?: string } | null): string => {
     if (!errorData) return "알 수 없는 오류가 발생했습니다."
@@ -300,7 +303,7 @@ export default function ProfileEditPage() {
   // 이름 변경 (DTO: { name })
   const handleNameChange = async () => {
     if (!nameForm.name.trim()) {
-      alert("이름을 입력해주세요.")
+      setModal({ open: true, message: "이름을 입력해주세요." })
       return
     }
     
@@ -321,15 +324,15 @@ export default function ProfileEditPage() {
       if (response.ok) {
         setUserProfile(prev => prev ? { ...prev, name: nameForm.name } : null)
         setIsEditingName(false)
-        alert("이름이 변경되었습니다.")
+        setModal({ open: true, message: "이름이 변경되었습니다." })
       } else {
         const errorMessage = await handleApiError(response, "이름 변경에 실패했습니다.")
         console.error("이름 변경 실패:", errorMessage)
-        alert(errorMessage)
+        setModal({ open: true, message: errorMessage })
       }
     } catch (error) {
       console.error("이름 변경 에러:", error)
-      alert("네트워크 오류가 발생했습니다. 다시 시도해주세요.")
+      setModal({ open: true, message: "네트워크 오류가 발생했습니다. 다시 시도해주세요." })
     } finally {
       setIsSubmitting(false)
     }
@@ -338,7 +341,7 @@ export default function ProfileEditPage() {
   // 전화번호 변경 (DTO: { phoneNumber })
   const handlePhoneChange = async () => {
     if (!phoneForm.phoneNumber.trim()) {
-      alert("전화번호를 입력해주세요.")
+      setModal({ open: true, message: "전화번호를 입력해주세요." })
       return
     }
     
@@ -347,7 +350,7 @@ export default function ProfileEditPage() {
     const cleanPhone = phoneForm.phoneNumber.replace(/-/g, '')
     
     if (!phonePattern.test(cleanPhone)) {
-      alert("전화번호 형식이 올바르지 않습니다. (예: 01012345678)")
+      setModal({ open: true, message: "전화번호 형식이 올바르지 않습니다. (예: 01012345678)" })
       return
     }
     
@@ -365,14 +368,14 @@ export default function ProfileEditPage() {
       console.log("- Request body:", JSON.stringify({ phoneNumber: cleanPhone }))
       
       if (!token) {
-        alert("인증 토큰이 없습니다. 다시 로그인해주세요.")
+        setModal({ open: true, message: "인증 토큰이 없습니다. 다시 로그인해주세요." })
         router.push("/")
         return
       }
       
       if (!process.env.NEXT_PUBLIC_API_URL) {
         console.error("NEXT_PUBLIC_API_URL 환경변수가 설정되지 않았습니다.")
-        alert("서버 설정 오류입니다. 관리자에게 문의하세요.")
+        setModal({ open: true, message: "서버 설정 오류입니다. 관리자에게 문의하세요." })
         return
       }
       
@@ -391,7 +394,7 @@ export default function ProfileEditPage() {
       // 전화번호 형식 재검증
       if (!cleanPhone || cleanPhone.length < 10 || cleanPhone.length > 11) {
         console.error("전화번호 길이 오류:", cleanPhone.length)
-        alert("전화번호 길이가 올바르지 않습니다.")
+        setModal({ open: true, message: "전화번호 길이가 올바르지 않습니다." })
         return
       }
       
@@ -416,7 +419,7 @@ export default function ProfileEditPage() {
         setPhoneForm({ phoneNumber: "" })
         
         console.log("전화번호 변경 성공:", cleanPhone)
-        alert("전화번호가 변경되었습니다.")
+        setModal({ open: true, message: "전화번호가 변경되었습니다." })
         
         // 추가로 최신 데이터를 다시 가져와서 확실하게 동기화
         try {
@@ -558,7 +561,7 @@ export default function ProfileEditPage() {
           console.warn("전화번호 변경 실패:", errorMessage)
         }
         
-        alert(errorMessage)
+        setModal({ open: true, message: errorMessage })
       }
     } catch (error) {
       console.error("전화번호 변경 네트워크 에러:", error)
@@ -576,7 +579,7 @@ export default function ProfileEditPage() {
         }
       }
       
-      alert(userMessage + " 다시 시도해주세요.")
+      setModal({ open: true, message: userMessage + " 다시 시도해주세요." })
     } finally {
       setIsSubmitting(false)
     }
@@ -585,24 +588,24 @@ export default function ProfileEditPage() {
   // 비밀번호 변경 (DTO: { oldPassword, newPassword }) - 6자리 숫자로 수정
   const handlePasswordChange = async () => {
     if (!passwordForm.oldPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
-      alert("모든 비밀번호 필드를 입력해주세요.")
+      setModal({ open: true, message: "모든 비밀번호 필드를 입력해주세요." })
       return
     }
     
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      alert("새 비밀번호와 확인 비밀번호가 일치하지 않습니다.")
+      setModal({ open: true, message: "새 비밀번호와 확인 비밀번호가 일치하지 않습니다." })
       return
     }
     
     // 6자리 숫자 검증 (백엔드 API 스펙에 맞춤)
     const passwordPattern = /^\d{6}$/
     if (!passwordPattern.test(passwordForm.oldPassword)) {
-      alert("현재 비밀번호는 6자리 숫자여야 합니다.")
+      setModal({ open: true, message: "현재 비밀번호는 6자리 숫자여야 합니다." })
       return
     }
     
     if (!passwordPattern.test(passwordForm.newPassword)) {
-      alert("새 비밀번호는 6자리 숫자여야 합니다.")
+      setModal({ open: true, message: "새 비밀번호는 6자리 숫자여야 합니다." })
       return
     }
     
@@ -626,15 +629,15 @@ export default function ProfileEditPage() {
       if (response.ok) {
         setIsEditingPassword(false)
         setPasswordForm({ oldPassword: "", newPassword: "", confirmPassword: "" })
-        alert("비밀번호가 변경되었습니다.")
+        setModal({ open: true, message: "비밀번호가 변경되었습니다." })
       } else {
         const errorMessage = await handleApiError(response, "비밀번호 변경에 실패했습니다.")
         console.error("비밀번호 변경 실패:", errorMessage)
-        alert(errorMessage)
+        setModal({ open: true, message: errorMessage })
       }
     } catch (error) {
       console.error("비밀번호 변경 에러:", error)
-      alert("네트워크 오류가 발생했습니다. 다시 시도해주세요.")
+      setModal({ open: true, message: "네트워크 오류가 발생했습니다. 다시 시도해주세요." })
     } finally {
       setIsSubmitting(false)
     }
@@ -661,15 +664,15 @@ export default function ProfileEditPage() {
         const imageUrl = mapProfileImageToUrl(profileImage)
         setProfileImageUrl(imageUrl)
         setIsEditingProfileImage(false)
-        alert("프로필 이미지가 변경되었습니다.")
+        setModal({ open: true, message: "프로필 이미지가 변경되었습니다." })
       } else {
         const errorMessage = await handleApiError(response, "프로필 이미지 변경에 실패했습니다.")
         console.error("프로필 이미지 변경 실패:", errorMessage)
-        alert(errorMessage)
+        setModal({ open: true, message: errorMessage })
       }
     } catch (error) {
       console.error("프로필 이미지 변경 에러:", error)
-      alert("네트워크 오류가 발생했습니다. 다시 시도해주세요.")
+      setModal({ open: true, message: "네트워크 오류가 발생했습니다. 다시 시도해주세요." })
     } finally {
       setIsSubmitting(false)
     }
@@ -993,6 +996,24 @@ export default function ProfileEditPage() {
           )}
         </div>
       </div>
+
+      {/* 모달 렌더링 */}
+      {modal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl p-6 shadow-xl max-w-xs w-full text-center">
+            <p className="mb-6 text-gray-800 text-base whitespace-pre-line">{modal.message}</p>
+            <button
+              onClick={() => {
+                setModal({ open: false, message: "" })
+                modal.onClose?.()
+              }}
+              className="w-full py-3 rounded-lg bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] text-white font-medium"
+            >
+              확인
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 } 
