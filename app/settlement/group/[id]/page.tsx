@@ -245,8 +245,11 @@ export default function SettlementGroupPage() {
   const [sharedTransactions, setSharedTransactions] = useState<SharedTransaction[]>([]);
   const [isSharedTxLoading, setIsSharedTxLoading] = useState(false);
   const [sharedTxError, setSharedTxError] = useState<string | null>(null);
-  const [myUserId, setMyUserId] = useState<number | undefined>(undefined);
   const [isTransferLoading, setIsTransferLoading] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showTransferSuccessModal, setShowTransferSuccessModal] = useState(false);
+  const [showFinalResetModal, setShowFinalResetModal] = useState(false);
 
   // 정산 정보 상태 (백엔드 API에서 가져온 값 사용)
   const [settlementData, setSettlementData] = useState<{
@@ -383,14 +386,6 @@ export default function SettlementGroupPage() {
     fetchSharedTransactions();
   }, [groupId, group?.id, group?.isSettling]);
 
-  // userId 설정
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const id = Number(localStorage.getItem('userId'));
-      setMyUserId(isNaN(id) ? undefined : id);
-    }
-  }, []);
-
   // 초대 코드 타이머
   useEffect(() => {
     if (!group?.inviteExpiry) return;
@@ -481,8 +476,6 @@ export default function SettlementGroupPage() {
   };
 
   const handleTransferToHost = async () => {
-    console.log('송금 버튼 클릭됨', group, myUserId);
-    // if (!group?.host || !myUserId) return;
     setIsTransferLoading(true);
     try {
       const token = await getValidToken();
@@ -501,34 +494,38 @@ export default function SettlementGroupPage() {
         return;
       }
 
-      alert('송금이 완료되었습니다!');
-      
-      // 데이터 새로고침 - 백엔드에서 최신 정산 데이터 가져오기
-      setTimeout(async () => {
-        try {
-          const updatedGroup = await groupAPI.refreshGroupData();
-          const updatedTransactions = await groupAPI.refreshTransactions();
-          
-          if (updatedGroup) {
-            setGroup(prev => ({ ...prev, ...updatedGroup }));
-          }
-          
-          if (updatedTransactions && updatedTransactions.length > 0) {
-            // 백엔드에서 계산된 최신 정산 데이터 사용
-            const firstTransaction = updatedTransactions[0];
-            setSettlementData({
-              totalAmount: firstTransaction.amount || 0,
-              memberCount: firstTransaction.maxMembers || 0,
-              perAmount: firstTransaction.dividedAmount || 0,
-            });
-            setGroup(prev => prev ? { ...prev, transactions: updatedTransactions } : null);
-          }
-        } catch (error) {
-          console.error('Failed to refresh data:', error);
-          window.location.reload();
-        }
-      }, 1000);
+      const result = await response.json();
+      const isAllDone = result.result === true;
 
+      if (isAllDone) {
+        setShowTransferSuccessModal(true);
+        // 송금 완료 모달 닫힌 후에 최종 안내 모달을 띄우기 위해 콜백 추가
+        // 아래 showTransferSuccessModal의 확인 버튼에서 setShowFinalResetModal(true)로 연결
+      } else {
+        setShowTransferSuccessModal(true);
+        // 데이터 새로고침 - 백엔드에서 최신 정산 데이터 가져오기
+        setTimeout(async () => {
+          try {
+            const updatedGroup = await groupAPI.refreshGroupData();
+            const updatedTransactions = await groupAPI.refreshTransactions();
+            if (updatedGroup) {
+              setGroup(prev => ({ ...prev, ...updatedGroup }));
+            }
+            if (updatedTransactions && updatedTransactions.length > 0) {
+              const firstTransaction = updatedTransactions[0];
+              setSettlementData({
+                totalAmount: firstTransaction.amount || 0,
+                memberCount: firstTransaction.maxMembers || 0,
+                perAmount: firstTransaction.dividedAmount || 0,
+              });
+              setGroup(prev => prev ? { ...prev, transactions: updatedTransactions } : null);
+            }
+          } catch (error) {
+            console.error('Failed to refresh data:', error);
+            window.location.reload();
+          }
+        }, 1000);
+      }
     } catch {
       alert('송금 중 오류가 발생했습니다.');
     } finally {
@@ -594,7 +591,7 @@ export default function SettlementGroupPage() {
     }
   };
 
-  const handleCancelSettlement = async () => {
+  const doCancelSettlement = async () => {
     try {
       const token = await getValidToken();
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/settlement-groups/${groupId}/cancel`, {
@@ -610,8 +607,7 @@ export default function SettlementGroupPage() {
     }
   };
 
-  const handleDeleteGroup = async () => {
-    if (!confirm('정말 그룹을 삭제하시겠습니까?')) return;
+  const doDeleteGroup = async () => {
     try {
       const token = await getValidToken();
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/settlement-groups/${groupId}`, {
@@ -675,7 +671,7 @@ export default function SettlementGroupPage() {
   return (
     <div className="flex min-h-screen flex-col bg-gray-50">
       {/* Header */}
-      <header className="flex items-center justify-between border-b border-gray-200 bg-white p-4">
+      <header className="flex items-center justify-between border-b border-gray-200 bg-white p-4 shadow-sm">
         <Link href="/settlement" className="text-gray-700 cursor-pointer">
           <ChevronLeft size={24} />
         </Link>
@@ -697,6 +693,8 @@ export default function SettlementGroupPage() {
             <button
               onClick={handleToggleActive}
               className={`w-12 h-6 rounded-full flex items-center transition-colors duration-300 ${group.isActive ? 'bg-[#0DAEFF]' : 'bg-gray-300'}`}
+              disabled={group.settlementStatus === 'IN_PROGRESS'}
+              style={group.settlementStatus === 'IN_PROGRESS' ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
             >
               <span
                 className={`inline-block w-5 h-5 bg-white rounded-full shadow transform transition-transform duration-300 ${group.isActive ? 'translate-x-6' : 'translate-x-1'}`}
@@ -764,7 +762,11 @@ export default function SettlementGroupPage() {
                 </div>
                 <div className="text-sm text-gray-600 mt-1 md:mt-0">
                   <span className="font-medium">정산 인원: </span>
-                  <span className="font-bold text-blue-700">{displaySettlementData?.memberCount || 0}명</span>
+                  <span className="font-bold text-blue-700">
+                    {(displaySettlementData?.memberCount && displaySettlementData.memberCount > 0)
+                      ? displaySettlementData.memberCount
+                      : (group?.members?.length || 0) + 1}명
+                  </span>
                 </div>
               </div>
               
@@ -821,7 +823,11 @@ export default function SettlementGroupPage() {
                 </div>
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-blue-600">정산 인원</span>
-                  <span className="font-bold text-blue-700">{displaySettlementData?.memberCount || 0}명</span>
+                  <span className="font-bold text-blue-700">
+                    {(displaySettlementData?.memberCount && displaySettlementData.memberCount > 0)
+                      ? displaySettlementData.memberCount
+                      : (group?.members?.length || 0) + 1}명
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-blue-600">1인당 정산 금액</span>
@@ -937,7 +943,11 @@ export default function SettlementGroupPage() {
                   </div>
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-blue-600">정산 인원</span>
-                    <span className="font-bold text-blue-700">{displaySettlementData?.memberCount || 0}명</span>
+                    <span className="font-bold text-blue-700">
+                      {(displaySettlementData?.memberCount && displaySettlementData.memberCount > 0)
+                        ? displaySettlementData.memberCount
+                        : (group?.members?.length || 0) + 1}명
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-blue-600">1인당 정산 금액</span>
@@ -1000,15 +1010,174 @@ export default function SettlementGroupPage() {
         </ModalPortal>
       )}
 
+      {showCancelModal && (
+        <ModalPortal>
+          {modalStyles.renderModalStyles()}
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center"
+            style={modalStyles.getModalBackgroundStyle()}
+            onClick={() => setShowCancelModal(false)}
+          >
+            <div
+              className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+              style={modalStyles.getCenterModalStyle()}
+              onClick={e => e.stopPropagation()}
+            >
+              <h2 className="mb-4 text-xl font-bold text-red-600">정산 취소 안내</h2>
+              <p className="mb-6 text-gray-700 text-base text-center">
+                정산을 정말 취소하시겠습니까?<br />
+                이미 정산금을 보낸 사람이 있다면, 해당 금액은 환불됩니다.
+              </p>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowCancelModal(false)}
+                  className="flex-1 rounded-lg border border-gray-300 py-3 text-center font-medium text-gray-700 cursor-pointer"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={() => { setShowCancelModal(false); doCancelSettlement(); }}
+                  className="flex-1 rounded-lg bg-gradient-to-b from-[#FF4D4D] to-[#FF3B3B] py-3 text-center font-medium text-white cursor-pointer"
+                >
+                  확인
+                </button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {showDeleteModal && (
+        <ModalPortal>
+          {modalStyles.renderModalStyles()}
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center"
+            style={modalStyles.getModalBackgroundStyle()}
+            onClick={() => setShowDeleteModal(false)}
+          >
+            <div
+              className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+              style={modalStyles.getCenterModalStyle()}
+              onClick={e => e.stopPropagation()}
+            >
+              <h2 className="mb-4 text-xl font-bold text-red-600">그룹 삭제 안내</h2>
+              <p className="mb-6 text-gray-700 text-base text-center">
+                정말 그룹을 삭제하시겠습니까?<br />
+                삭제하면 복구할 수 없습니다.
+              </p>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  className="flex-1 rounded-lg border border-gray-300 py-3 text-center font-medium text-gray-700 cursor-pointer"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={() => { setShowDeleteModal(false); doDeleteGroup(); }}
+                  className="flex-1 rounded-lg bg-gradient-to-b from-[#FF4D4D] to-[#FF3B3B] py-3 text-center font-medium text-white cursor-pointer"
+                >
+                  확인
+                </button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {showTransferSuccessModal && (
+        <ModalPortal>
+          {modalStyles.renderModalStyles()}
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center"
+            style={modalStyles.getModalBackgroundStyle()}
+            onClick={() => setShowTransferSuccessModal(false)}
+          >
+            <div
+              className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+              style={modalStyles.getCenterModalStyle()}
+              onClick={e => e.stopPropagation()}
+            >
+              <h2 className="mb-4 text-xl font-bold text-blue-600">송금 완료</h2>
+              <p className="mb-6 text-gray-700 text-base text-center">
+                송금이 완료되었습니다.
+              </p>
+              <div className="flex justify-center">
+                <button
+                  onClick={() => {
+                    setShowTransferSuccessModal(false);
+                    // isAllDone이 true였던 경우에만 다음 모달로
+                    if (group && group.transactions && group.transactions.length > 0) {
+                      // 기존 송금 완료 후 새로고침 로직이 아니라, isAllDone true일 때만 다음 모달
+                      setShowFinalResetModal(true);
+                    }
+                  }}
+                  className="rounded-lg bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] py-3 px-8 text-center font-medium text-white cursor-pointer"
+                >
+                  확인
+                </button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
+      {showFinalResetModal && (
+        <ModalPortal>
+          {modalStyles.renderModalStyles()}
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center"
+            style={modalStyles.getModalBackgroundStyle()}
+            onClick={() => setShowFinalResetModal(false)}
+          >
+            <div
+              className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl"
+              style={modalStyles.getCenterModalStyle()}
+              onClick={e => e.stopPropagation()}
+            >
+              <h2 className="mb-4 text-xl font-bold text-blue-600">정산 완료</h2>
+              <p className="mb-6 text-gray-700 text-base text-center">
+                모든 멤버의 정산이 완료되어,<br />지금까지의 정산 내역이 초기화 됩니다.
+              </p>
+              <div className="flex justify-center">
+                <button
+                  onClick={async () => {
+                    setShowFinalResetModal(false);
+                    // 그룹 삭제 API 호출
+                    try {
+                      const token = await getValidToken();
+                      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/settlement-groups/${groupId}`, {
+                        method: 'POST',
+                        headers: { Authorization: `Bearer ${token}` },
+                        credentials: 'include',
+                      });
+                    } catch {}
+                    router.push('/settlement');
+                  }}
+                  className="rounded-lg bg-gradient-to-b from-[#4DA9FF] to-[#3B9EFF] py-3 px-8 text-center font-medium text-white cursor-pointer"
+                >
+                  확인
+                </button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
+
       {/* 메인 컨텐츠 마지막에 버튼 배치 */}
       <div className="mt-8 mb-6 flex flex-col space-y-2">
         {group.isOwner && group.settlementStatus === 'IN_PROGRESS' && (
-          <button className="w-[95%] mx-auto rounded-lg bg-gradient-to-b from-[#FF4D4D] to-[#FF3B3B] py-3 text-center font-medium text-white shadow-md cursor-pointer" onClick={handleCancelSettlement}>
+          <button
+            className="w-[95%] mx-auto rounded-lg bg-gradient-to-b from-[#FF4D4D] to-[#FF3B3B] py-3 text-center font-medium text-white shadow-md cursor-pointer"
+            onClick={() => setShowCancelModal(true)}
+          >
             정산 취소
           </button>
         )}
         {group.isOwner && (
-          <button className="w-[95%] mx-auto rounded-lg border border-gray-300 py-3 text-center font-medium text-gray-700 shadow-md cursor-pointer" onClick={handleDeleteGroup}>
+          <button
+            className="w-[95%] mx-auto rounded-lg border border-gray-300 py-3 text-center font-medium text-gray-700 shadow-md cursor-pointer"
+            onClick={() => setShowDeleteModal(true)}
+          >
             그룹 삭제
           </button>
         )}
