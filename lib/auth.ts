@@ -5,20 +5,42 @@ interface TokenPayload {
   sub: string;
 }
 
-export const getToken = () => {
-  return document.cookie
-    .split("; ")
-    .find((row) => row.startsWith("accessToken="))
-    ?.split("=")[1];
-};
+// --- TOKEN STORAGE (localStorage 기반) ---
 
-export const setToken = (token: string) => {
-  document.cookie = `accessToken=${token}; path=/; secure; samesite=strict`;
-};
+/**
+ * accessToken을 localStorage에 저장
+ */
+export function setToken(token: string) {
+  localStorage.setItem("accessToken", token)
+}
 
-export const removeToken = () => {
-  document.cookie = "accessToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-};
+/**
+ * accessToken을 localStorage에서 가져옴
+ */
+export function getToken(): string | null {
+  return localStorage.getItem("accessToken")
+}
+
+/**
+ * accessToken을 localStorage에서 제거
+ */
+export function removeToken() {
+  localStorage.removeItem("accessToken")
+}
+
+// --- FETCH WRAPPER ---
+
+/**
+ * 자동으로 Authorization 헤더를 붙여주는 fetch wrapper
+ */
+export async function secureFetch(input: RequestInfo, init: RequestInit = {}) {
+  const token = getToken()
+  const headers = {
+    ...(init.headers || {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  }
+  return fetch(input, { ...init, headers })
+}
 
 export const isTokenExpired = (token: string) => {
   try {

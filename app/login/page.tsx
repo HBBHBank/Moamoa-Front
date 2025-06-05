@@ -4,7 +4,6 @@ import type React from "react"
 import { useState } from "react"
 import { ChevronLeft, X, Delete } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { setToken } from "@/lib/auth"
 
 type FieldError = {
@@ -17,8 +16,6 @@ type FieldErrors = {
 }
 
 export default function LoginPage() {
-  const router = useRouter()
-
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPasswordInput, setShowPasswordInput] = useState(false)
@@ -63,7 +60,7 @@ export default function LoginPage() {
     }
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"}/api/v1/auth/login`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -120,7 +117,7 @@ export default function LoginPage() {
       const { accessToken } = result
       setToken(accessToken)
       localStorage.setItem("userEmail", email)
-      router.push("/home")
+      window.location.href = "/home"
     } catch (error) {
       console.error(error)
       alert("서버 오류가 발생했습니다.")
