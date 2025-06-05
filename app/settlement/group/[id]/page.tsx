@@ -226,6 +226,21 @@ const useGroupAPI = (groupId: string) => {
   };
 };
 
+// 프로필 이미지 매핑 함수 (enum 값 → 정적 이미지, URL은 그대로)
+const mapProfileImageToUrl = (profileImageValue: string): string | null => {
+  if (!profileImageValue) return null;
+  if (profileImageValue.startsWith('http://') || profileImageValue.startsWith('https://')) {
+    return profileImageValue;
+  }
+  const imageMap: Record<string, string> = {
+    'img_1': '/images/profile/img_1.png',
+    'img_2': '/images/profile/img_2.png',
+    'img_3': '/images/profile/img_3.png',
+    'img_4': '/images/profile/img_4.png',
+  };
+  return imageMap[profileImageValue] || null;
+};
+
 export default function SettlementGroupPage() {
   const router = useRouter();
   const params = useParams();
@@ -288,7 +303,52 @@ export default function SettlementGroupPage() {
         }
 
         const groupData = await groupResponse.json();
-        setGroup(groupData.result);
+        const groupResult = groupData.result;
+
+        // 멤버별 userId 목록을 받아와서 각 userId로 프로필 조회 (방장 포함)
+        let memberProfiles = groupResult.members;
+        try {
+          // 1. userId 목록 조회 (방장 포함)
+          const memberIdsRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/settlement-groups/${groupId}/member-ids`, {
+            headers: { Authorization: `Bearer ${token}` },
+            credentials: "include"
+          });
+          if (memberIdsRes.ok) {
+            const memberIdsData = await memberIdsRes.json();
+            const userIds: number[] = Array.isArray(memberIdsData.result) ? memberIdsData.result : [];
+            // 2. 각 userId로 프로필 조회
+            const userProfiles = await Promise.all(userIds.map(async (userId) => {
+              try {
+                const profileRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/users/${userId}/profile`, {
+                  headers: { Authorization: `Bearer ${token}` },
+                  credentials: "include"
+                });
+                if (profileRes.ok) {
+                  const profileData = await profileRes.json();
+                  // profileData.result: { name, profileImage }
+                  return { userId, ...profileData.result };
+                }
+              } catch {}
+              return { userId };
+            }));
+            // 3. 기존 멤버 정보에 프로필 매핑
+            memberProfiles = groupResult.members.map((member: SettlementMember) => {
+              const found = userProfiles.find((p) => p.userId === member.userId);
+              return found ? { ...member, name: found.name || member.name, profileImage: found.profileImage || member.profileImage } : member;
+            });
+            // 방장도 userId로 매핑
+            if (groupResult.host && groupResult.host.id) {
+              const hostProfile = userProfiles.find((p) => p.userId === groupResult.host.id);
+              if (hostProfile) {
+                groupResult.host.name = hostProfile.name || groupResult.host.name;
+                groupResult.host.profileImage = hostProfile.profileImage || groupResult.host.profileImage;
+              }
+            }
+          }
+        } catch {}
+        groupResult.members = memberProfiles;
+
+        setGroup(groupResult);
 
         // 지갑 확인
         const walletResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/wallet/all`, {
@@ -533,6 +593,7 @@ export default function SettlementGroupPage() {
     }
   };
 
+  // 멤버 리스트 생성 함수
   const getMemberList = (): MemberListItem[] => {
     if (!group?.host) return [];
 
@@ -542,7 +603,7 @@ export default function SettlementGroupPage() {
     memberList.push({
       id: group.host.id,
       name: group.host.name,
-      profileImage: group.host.profileImage,
+      profileImage: mapProfileImageToUrl(group.host.profileImage) || "",
       isHost: true,
       hasTransferred: false,
       color: "bg-blue-500",
@@ -555,7 +616,7 @@ export default function SettlementGroupPage() {
         .map((member) => ({
           id: member.userId,
           name: member.name,
-          profileImage: member.profileImage,
+          profileImage: mapProfileImageToUrl(member.profileImage) || "",
           isHost: false,
           hasTransferred: member.hasTransferred,
           color: "bg-gray-400",
@@ -707,31 +768,44 @@ export default function SettlementGroupPage() {
         <div className="rounded-xl bg-white shadow p-4 mb-4">
           <h2 className="mb-2 text-lg font-medium text-blue-700">멤버 {memberList.length}/{group.maxMembers}</h2>
           <div className="space-y-4">
-            {memberList.map((member) => (
-              <div key={member.id} className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className={`relative mr-3 h-10 w-10 rounded-full ${member.color} flex items-center justify-center text-white font-medium`}>
-                    {member.name.charAt(0)}
-                  </div>
-                  <div>
-                    <div className="flex items-center">
-                      <p className="font-medium">{member.name}</p>
-                      {member.isHost && (
-                        <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-600">대표</span>
+            {memberList.map((member) => {
+              // 디버깅용 로그
+              console.log('멤버:', member.name, 'profileImage:', member.profileImage);
+              return (
+                <div key={member.id} className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    {member.profileImage ? (
+                      <img
+                        src={member.profileImage}
+                        alt={member.name}
+                        className="relative mr-3 h-10 w-10 rounded-full object-cover border border-gray-200"
+                        onError={e => { e.currentTarget.style.display = 'none'; }}
+                      />
+                    ) : (
+                      <div className={`relative mr-3 h-10 w-10 rounded-full ${member.color} flex items-center justify-center text-white font-medium`}>
+                        {member.name.charAt(0)}
+                      </div>
+                    )}
+                    <div>
+                      <div className="flex items-center">
+                        <p className="font-medium">{member.name}</p>
+                        {member.isHost && (
+                          <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-600">대표</span>
+                        )}
+                      </div>
+                      {group.isSettling && !member.isHost && (
+                        <p className="text-sm text-gray-500">{member.hasTransferred ? "정산 완료" : "정산 대기중"}</p>
                       )}
                     </div>
-                    {group.isSettling && !member.isHost && (
-                      <p className="text-sm text-gray-500">{member.hasTransferred ? "정산 완료" : "정산 대기중"}</p>
-                    )}
                   </div>
+                  {group.isSettling && member.hasTransferred && !member.isHost && (
+                    <div className="rounded-full bg-green-100 p-1 text-green-500">
+                      <Check size={16} />
+                    </div>
+                  )}
                 </div>
-                {group.isSettling && member.hasTransferred && !member.isHost && (
-                  <div className="rounded-full bg-green-100 p-1 text-green-500">
-                    <Check size={16} />
-                  </div>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
