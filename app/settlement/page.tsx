@@ -265,7 +265,7 @@ export default function SettlementPage() {
   return (
     <div className="flex min-h-screen flex-col bg-gray-50">
       {/* Header */}
-      <header className="flex items-center justify-between border-b border-gray-200 bg-white p-4">
+      <header className="flex items-center justify-between border-b border-gray-200 bg-white p-4 shadow-sm">
         <Link href="/home" className="text-gray-700">
           <ChevronLeft size={24} />
         </Link>

@@ -235,7 +235,7 @@ export default function CreateSettlementGroupPage() {
   return (
     <div className="flex min-h-screen flex-col bg-white">
       {/* 헤더 섹션 */}
-      <header className="flex items-center justify-between border-b border-gray-200 bg-white p-4">
+      <header className="flex items-center justify-between border-b border-gray-200 bg-white p-4 shadow-sm">
         {/* 뒤로 가기 링크 */}
         <Link href="/settlement" className="text-gray-700 cursor-pointer">
           <ChevronLeft size={24} /> {/* 왼쪽 화살표 아이콘 */}
