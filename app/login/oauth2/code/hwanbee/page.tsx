@@ -1,10 +1,10 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { getValidToken } from "@/lib/auth"
 
-export default function OAuthCodeHandlerPage() {
+function OAuthCodeHandlerInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -50,5 +50,13 @@ export default function OAuthCodeHandlerPage() {
     <div className="flex flex-col items-center justify-center min-h-screen">
       <p>OAuth 인증 처리 중입니다...</p>
     </div>
+  )
+}
+
+export default function OAuthCodeHandlerPage() {
+  return (
+    <Suspense>
+      <OAuthCodeHandlerInner />
+    </Suspense>
   )
 } 
