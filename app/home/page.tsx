@@ -188,26 +188,30 @@ export default function HomePage() {
       }
     };
     fetchRates();
+  }, []);
 
-    const interval = setInterval(() => {
-      if (carouselRef.current && !isScrolling) {
-        carouselRef.current.scrollLeft += 1
-        if (carouselRef.current.scrollLeft % 150 === 0) {
-          const newIndex = Math.floor(carouselRef.current.scrollLeft / 150) % exchangeRates.length
-          setActiveCardIndex(newIndex)
+  // 스크롤 애니메이션은 별도 관리
+  useEffect(() => {
+    if (!isScrolling) {
+      const interval = setInterval(() => {
+        if (carouselRef.current) {
+          carouselRef.current.scrollLeft += 1
+          if (carouselRef.current.scrollLeft % 150 === 0) {
+            const newIndex = Math.floor(carouselRef.current.scrollLeft / 150) % exchangeRates.length
+            setActiveCardIndex(newIndex)
+          }
+          if (
+            carouselRef.current.scrollLeft >=
+            carouselRef.current.scrollWidth - carouselRef.current.clientWidth - 10
+          ) {
+            carouselRef.current.scrollLeft = 0
+            setActiveCardIndex(0)
+          }
         }
-        if (
-          carouselRef.current.scrollLeft >=
-          carouselRef.current.scrollWidth - carouselRef.current.clientWidth - 10
-        ) {
-          carouselRef.current.scrollLeft = 0
-          setActiveCardIndex(0)
-        }
-      }
-    }, 30)
-
-    return () => clearInterval(interval)
-  }, [router, isScrolling])
+      }, 30)
+      return () => clearInterval(interval)
+    }
+  }, [isScrolling, exchangeRates.length])
 
   const handleCharge = () => {
     router.push("/wallet/charge")
