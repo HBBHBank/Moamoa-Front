@@ -223,9 +223,13 @@ export default function ChargePage() {
   // Handle next step in charge process
   const handleNext = async () => {
     if (isLoading) return;
-    if (step === 1 && amount && selectedAccount && validateAmount()) {
-      setStep(2)
-    } else if (step === 2 && pin.length === 6 && selectedAccount) {
+    if (step === 1 && amount && validateAmount()) {
+      if (selectedAccount) {
+        setStep(3); // 계좌가 있으면 바로 PIN 입력(충전) 화면으로 이동
+      } else {
+        setStep(2); // 계좌가 없으면 계좌 등록 화면으로 이동
+      }
+    } else if ((step === 2 || step === 3) && pin.length === 6 && selectedAccount) {
       // Defensive checks for required fields
       if (!selectedAccount.accountNumber) {
         alert('계좌번호가 없습니다.');
@@ -250,12 +254,12 @@ export default function ChargePage() {
       setIsLoading(true);
       try {
         const params = {
-          walletNumber: selectedAccount.accountNumber,
+          currencyCode: selectedCurrency?.code?.toUpperCase(),
           hwanbeeAccountNumber: selectedAccount.accountNumber,
           amount: Number.parseInt(amount),
           password: pin
         };
-        console.log('Charge API params:', params);
+        console.log('Charge API params (RechargeRequestDto):', params);
         const token = await getValidToken();
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/recharge`, {
           method: 'POST',
