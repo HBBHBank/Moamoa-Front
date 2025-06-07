@@ -156,7 +156,7 @@ export default function HomePage() {
         console.log('[환율] API URL:', process.env.NEXT_PUBLIC_API_URL);
         const token = await getValidToken();
         console.log('[환율] Token:', token ? token.substring(0, 20) + '...' : '없음');
-        const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/exchange/rates`;
+        const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/exchange/rates-v2`;
         console.log('[환율] Fetching:', apiUrl);
         const res = await fetch(apiUrl, {
           headers: { Authorization: `Bearer ${token}` },
