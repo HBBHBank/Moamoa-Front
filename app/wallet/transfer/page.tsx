@@ -281,7 +281,7 @@ export default function TransferPage() {
     } else if (step === 3 && pin.length === 6) {
       try {
         const token = await getValidToken();
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/transfers/points`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/transfers/points-v3`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
