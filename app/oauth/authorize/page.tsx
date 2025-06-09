@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 const OAUTH_CLIENT_ID = "184837506" // 실제 값으로 교체
 const OAUTH_SCOPE = "read"
 const OAUTH_STATE = "xyz123"
-const OAUTH_AUTH_URL = "https://auth.hwanbee.site/oauth2/token"
+const OAUTH_AUTH_URL = "https://auth.hwanbee.site/oauth2/authorize"
 const OAUTH_REDIRECT_URI = "https://moamoa-front.vercel.app//login/oauth2/code/hwanbee"
 
 export default function OAuthAuthorizePage() {
