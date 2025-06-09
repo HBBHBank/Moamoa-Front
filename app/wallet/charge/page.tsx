@@ -324,7 +324,7 @@ export default function ChargePage() {
       const data = await res.json();
       if (!data.result) {
         // 인증 안 되어 있으면 OAuth 인가 플로우로 이동
-        window.location.href = "/oauth/authorize?redirect=/wallet/charge";
+        window.location.href = "/oauth/authorize?redirect=https://moamoa-front.vercel.app/login/oauth2/code/hwanbee";
         return;
       }
     } catch {
