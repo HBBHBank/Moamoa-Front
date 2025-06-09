@@ -28,6 +28,27 @@ export function removeToken() {
   localStorage.removeItem("accessToken")
 }
 
+/**
+ * refreshToken을 localStorage에 저장
+ */
+export function setRefreshToken(token: string) {
+  localStorage.setItem("refreshToken", token);
+}
+
+/**
+ * refreshToken을 localStorage에서 가져옴
+ */
+export function getRefreshToken(): string | null {
+  return localStorage.getItem("refreshToken");
+}
+
+/**
+ * refreshToken을 localStorage에서 제거
+ */
+export function removeRefreshToken() {
+  localStorage.removeItem("refreshToken");
+}
+
 // --- FETCH WRAPPER ---
 
 /**
@@ -53,7 +74,7 @@ export const isTokenExpired = (token: string) => {
 
 export const refreshToken = async () => {
   try {
-    const refreshToken = localStorage.getItem("refreshToken");
+    const refreshToken = getRefreshToken();
     if (!refreshToken) throw new Error("No refresh token found");
 
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/jwt/reissue`, {
