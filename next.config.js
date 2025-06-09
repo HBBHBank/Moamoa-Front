@@ -41,7 +41,7 @@ const nextConfig = {
   // ✅ /oauth/authorize는 정적 생성하지 않음
   experimental: {
     // App Router에서 동적 렌더링 지원을 명시적으로 활성화
-    serverActions: true,
+    serverActions: {},
   },
   // ✅ 특정 경로에 대해 동적 처리 강제
   async headers() {
