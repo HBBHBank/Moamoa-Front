@@ -283,3 +283,5 @@ export default function QrPaymentPage() {
     </div>
   )
 }
+
+export const dynamic = "force-dynamic";
