@@ -33,38 +33,7 @@ export default function HwanbiAccountExchangePage() {
   const [newCurrency, setNewCurrency] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
   const [addStep, setAddStep] = useState<0 | 1>(0); // 0: 계좌입력, 1: 인증코드입력
-  const [exchangeRate, setExchangeRate] = useState<number | null>(null);
-
-  // 환율 정보 fetch
-  useEffect(() => {
-    // 외화 계좌가 선택된 경우에만 환율 정보 조회
-    const fromAcc = accounts.find(acc => acc.accountNumber === fromAccount);
-    const toAcc = accounts.find(acc => acc.accountNumber === toAccount);
-    // 외화 계좌: KRW가 아닌 계좌
-    const fcyAcc = fromAcc && fromAcc.currency !== "KRW" ? fromAcc : toAcc && toAcc.currency !== "KRW" ? toAcc : null;
-    if (!fcyAcc) {
-      setExchangeRate(null);
-      return;
-    }
-    const fetchRate = async () => {
-      try {
-        const token = await getValidToken();
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/exchange/rates?currency=${fcyAcc.currency}`, {
-          headers: { Authorization: `Bearer ${token}` },
-          credentials: "include"
-        });
-        const result = await res.json();
-        if (result.result && result.result.data && result.result.data.bankOfKoreaRate) {
-          setExchangeRate(Number(result.result.data.bankOfKoreaRate));
-        } else {
-          setExchangeRate(null);
-        }
-      } catch {
-        setExchangeRate(null);
-      }
-    };
-    fetchRate();
-  }, [accounts, fromAccount, toAccount]);
+  const exchangeRate = 1382.5; // 더미 환율 값 (예: 1 USD = 1382.5 KRW)
 
   // 환율 예시 (실제 환율 API 연동 필요)
   const calcToAmount = () => {
