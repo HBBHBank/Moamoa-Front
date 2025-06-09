@@ -757,7 +757,7 @@ export default function ChargePage() {
           <div className="w-full max-w-md">
             <h2 className="mb-6 text-center text-xl font-medium">환비 앱에서 받은 3자리 인증코드를 입력해 주세요.</h2>
             <input
-              type="number"
+              type="string"
               value={verificationCode}
               onChange={e => setVerificationCode(e.target.value)}
               placeholder="인증코드 (3자리)"
