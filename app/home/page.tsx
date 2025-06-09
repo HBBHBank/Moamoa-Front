@@ -96,16 +96,6 @@ const fetchWalletBalances = async (router: ReturnType<typeof useRouter>): Promis
   }
 }
 
-// 환율 국가 코드와 국기, 한글명 매핑
-const currencyMeta: Record<string, { country: string; flagSrc: string }> = {
-  JPY: { country: "일본", flagSrc: "/images/flags/japan.png" },
-  EUR: { country: "유럽", flagSrc: "/images/flags/eu.png" },
-  USD: { country: "미국", flagSrc: "/images/flags/usa.png" },
-  CNY: { country: "중국", flagSrc: "/images/flags/china.png" },
-  VND: { country: "베트남", flagSrc: "/images/flags/vietnam.png" },
-  INR: { country: "인도", flagSrc: "/images/flags/india.png" },
-}
-
 // 환율 변동 더미 데이터 (전날 대비)
 const dummyRateChange: Record<string, { diff: number; percent: number }> = {
   JPY: { diff: -0.8, percent: -0.41 },
@@ -114,12 +104,6 @@ const dummyRateChange: Record<string, { diff: number; percent: number }> = {
   CNY: { diff: -0.8, percent: -0.41 },
   VND: { diff: 0.001, percent: 0.18 },
   INR: { diff: 0.02, percent: 0.13 },
-};
-
-type ExchangeRateDataDto = {
-  currency: string;
-  registrationTime: string;
-  bankOfKoreaRate: string;
 };
 
 export default function HomePage() {
@@ -150,44 +134,51 @@ export default function HomePage() {
 
     checkAuth();
 
-    // 환율 정보 API robust fetch (with token, logging, and correct structure)
-    const fetchRates = async () => {
-      try {
-        console.log('[환율] API URL:', process.env.NEXT_PUBLIC_API_URL);
-        const token = await getValidToken();
-        console.log('[환율] Token:', token ? token.substring(0, 20) + '...' : '없음');
-        const apiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/exchange/rates-v3`;
-        console.log('[환율] Fetching:', apiUrl);
-        const res = await fetch(apiUrl, {
-          headers: { Authorization: `Bearer ${token}` },
-          credentials: "include"
-        });
-        console.log('[환율] Response status:', res.status);
-        const result = await res.json();
-        console.log('[환율] 최종 응답 구조 확인:', JSON.stringify(result, null, 2));
-        const data: ExchangeRateDataDto[] = Array.isArray(result.result?.data) ? result.result.data : [];
-        if (!data.length) {
-          console.warn('[환율] result.result.data가 비어있거나 배열이 아님:', result.result?.data);
-        } else {
-          console.log('[환율] 사용된 경로: result.result.data');
-        }
-        const rates: ExchangeRate[] = data.map((item) => {
-          const meta = currencyMeta[item.currency] || { country: item.currency, flagSrc: "" };
-          return {
-            country: meta.country,
-            code: item.currency,
-            flagSrc: meta.flagSrc,
-            rate: item.bankOfKoreaRate,
-            registrationTime: item.registrationTime,
-          };
-        });
-        setExchangeRates(rates);
-      } catch (err) {
-        console.error('[환율] API 호출 실패:', err);
-        setExchangeRates([]);
-      }
-    };
-    fetchRates();
+    // 환율 정보 더미 데이터로 세팅
+    setExchangeRates([
+      {
+        country: "미국",
+        code: "USD",
+        flagSrc: "/images/flags/usa.png",
+        rate: "1,380.50",
+        registrationTime: "2024-06-01 09:00:00"
+      },
+      {
+        country: "유럽",
+        code: "EUR",
+        flagSrc: "/images/flags/eu.png",
+        rate: "1,490.20",
+        registrationTime: "2024-06-01 09:00:00"
+      },
+      {
+        country: "일본",
+        code: "JPY",
+        flagSrc: "/images/flags/japan.png",
+        rate: "8.95",
+        registrationTime: "2024-06-01 09:00:00"
+      },
+      {
+        country: "중국",
+        code: "CNY",
+        flagSrc: "/images/flags/china.png",
+        rate: "190.10",
+        registrationTime: "2024-06-01 09:00:00"
+      },
+      {
+        country: "베트남",
+        code: "VND",
+        flagSrc: "/images/flags/vietnam.png",
+        rate: "0.056",
+        registrationTime: "2024-06-01 09:00:00"
+      },
+      {
+        country: "인도",
+        code: "INR",
+        flagSrc: "/images/flags/india.png",
+        rate: "16.50",
+        registrationTime: "2024-06-01 09:00:00"
+      },
+    ]);
   }, []);
 
   // 스크롤 애니메이션은 별도 관리

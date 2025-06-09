@@ -143,31 +143,8 @@ export default function HwanbiAccountExchangePage() {
     const krwAcc = fromAcc.currency === "KRW" ? fromAcc : toAcc.currency === "KRW" ? toAcc : null;
     const fcyAcc = fromAcc.currency !== "KRW" ? fromAcc : toAcc.currency !== "KRW" ? toAcc : null;
     if (!krwAcc || !fcyAcc) return alert("KRW 계좌와 외화 계좌를 모두 선택해 주세요.");
-    try {
-      const token = await getValidToken();
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/exchange/deal`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          krwAccount: krwAcc.accountNumber,
-          fcyAccount: fcyAcc.accountNumber,
-          krwAmount: Number(amount),
-          currencyCode: fcyAcc.currency,
-        }),
-      });
-      if (!res.ok) {
-        alert("환전 요청에 실패했습니다.");
-        return;
-      }
-      // 성공 시 PIN 입력 단계로 진행
-      setShowPin(true);
-    } catch {
-      alert("환전 요청 중 오류가 발생했습니다.");
-    }
+    // 실제 환전 API 호출 부분 제거, 바로 PIN 입력 단계로 진행
+    setShowPin(true);
   };
 
   // 핀 입력 완료
