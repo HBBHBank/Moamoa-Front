@@ -53,10 +53,13 @@ export const isTokenExpired = (token: string) => {
 
 export const refreshToken = async () => {
   try {
+    const refreshToken = localStorage.getItem("refreshToken");
+    if (!refreshToken) throw new Error("No refresh token found");
+
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/refresh`, {
       method: "POST",
-      credentials: "include",
       headers: {
+        "Authorization": `Bearer ${refreshToken}`,
         "Content-Type": "application/json",
       },
     });
