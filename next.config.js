@@ -23,7 +23,7 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'your-api-domain.com',
+        hostname: 'moamoa.hwanbee.site',
         pathname: '/static/**',
       }
     ],
