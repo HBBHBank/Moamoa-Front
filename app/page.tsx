@@ -12,12 +12,12 @@ export default function HomePage() {
 
           <div className="mt-6 w-full space-y-6">
             <Link href="/signup/terms" className="block">
-              <button className="flex h-[60px] w-full items-center justify-center rounded-[30px] bg-[#0DAEFF] text-center font-medium text-white shadow-[7px_7px_10px_0px_#D9D9D9] transition-all hover:bg-[#0A9EE8]">
+              <button className="flex h-[60px] w-full items-center justify-center rounded-[30px] bg-[#0DAEFF] text-center font-medium text-white shadow-[7px_7px_10px_0px_#D9D9D9] transition-all hover:bg-[#0A9EE8] cursor-pointer">
                 <span className="text-lg">가입하기</span>
               </button>
             </Link>
             <Link href="/login" className="block">
-              <button className="flex h-[60px] w-full items-center justify-center rounded-[30px] bg-[#0DAEFF] text-center font-medium text-white shadow-[7px_7px_10px_0px_#D9D9D9] transition-all hover:bg-[#0A9EE8]">
+              <button className="flex h-[60px] w-full items-center justify-center rounded-[30px] bg-[#0DAEFF] text-center font-medium text-white shadow-[7px_7px_10px_0px_#D9D9D9] transition-all hover:bg-[#0A9EE8] cursor-pointer">
                 <span className="text-lg">로그인</span>
               </button>
             </Link>
