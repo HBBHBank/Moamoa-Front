@@ -56,12 +56,12 @@ export const refreshToken = async () => {
     const refreshToken = localStorage.getItem("refreshToken");
     if (!refreshToken) throw new Error("No refresh token found");
 
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/refresh`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/jwt/reissue`, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${refreshToken}`,
         "Content-Type": "application/json",
       },
+      body: JSON.stringify({ refreshToken }), // ✅ JSON 바디에 포함
     });
 
     if (!response.ok) {
@@ -70,35 +70,25 @@ export const refreshToken = async () => {
     }
 
     const result = await response.json();
-    
-    // 응답 형식 검증
+
     if (!result || typeof result !== 'object') {
       throw new Error("Invalid response format");
     }
 
-    // data 필드가 있는 경우
-    if (result.data) {
-      if (!result.data.accessToken) {
-        throw new Error("Access token not found in response");
-      }
-      return result.data.accessToken;
-    }
-    
-    // data 필드가 없는 경우 (직접 accessToken이 있는 경우)
     if (!result.accessToken) {
       throw new Error("Access token not found in response");
     }
-    
+
     return result.accessToken;
   } catch (error) {
     console.error("Error refreshing token:", error);
-    // 토큰 갱신 실패 시 로그인 페이지로 리다이렉트
     if (typeof window !== 'undefined') {
       window.location.href = '/login';
     }
     throw error;
   }
 };
+
 
 export const getValidToken = async () => {
   const token = getToken();
