@@ -33,7 +33,38 @@ export default function HwanbiAccountExchangePage() {
   const [newCurrency, setNewCurrency] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
   const [addStep, setAddStep] = useState<0 | 1>(0); // 0: 계좌입력, 1: 인증코드입력
-  const exchangeRate = 1382.5; // 더미 환율 값 (예: 1 USD = 1382.5 KRW)
+  const [exchangeRate, setExchangeRate] = useState<number | null>(null);
+
+  // 환율 정보 fetch
+  useEffect(() => {
+    // 외화 계좌가 선택된 경우에만 환율 정보 조회
+    const fromAcc = accounts.find(acc => acc.accountNumber === fromAccount);
+    const toAcc = accounts.find(acc => acc.accountNumber === toAccount);
+    // 외화 계좌: KRW가 아닌 계좌
+    const fcyAcc = fromAcc && fromAcc.currency !== "KRW" ? fromAcc : toAcc && toAcc.currency !== "KRW" ? toAcc : null;
+    if (!fcyAcc) {
+      setExchangeRate(null);
+      return;
+    }
+    const fetchRate = async () => {
+      try {
+        const token = await getValidToken();
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/exchange/rates?currency=${fcyAcc.currency}`, {
+          headers: { Authorization: `Bearer ${token}` },
+          credentials: "include"
+        });
+        const result = await res.json();
+        if (result.result && result.result.data && result.result.data.bankOfKoreaRate) {
+          setExchangeRate(Number(result.result.data.bankOfKoreaRate));
+        } else {
+          setExchangeRate(null);
+        }
+      } catch {
+        setExchangeRate(null);
+      }
+    };
+    fetchRate();
+  }, [accounts, fromAccount, toAccount]);
 
   // 환율 예시 (실제 환율 API 연동 필요)
   const calcToAmount = () => {
@@ -112,8 +143,31 @@ export default function HwanbiAccountExchangePage() {
     const krwAcc = fromAcc.currency === "KRW" ? fromAcc : toAcc.currency === "KRW" ? toAcc : null;
     const fcyAcc = fromAcc.currency !== "KRW" ? fromAcc : toAcc.currency !== "KRW" ? toAcc : null;
     if (!krwAcc || !fcyAcc) return alert("KRW 계좌와 외화 계좌를 모두 선택해 주세요.");
-    // 실제 환전 API 호출 부분 제거, 바로 PIN 입력 단계로 진행
-    setShowPin(true);
+    try {
+      const token = await getValidToken();
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/exchange/deal`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          krwAccount: krwAcc.accountNumber,
+          fcyAccount: fcyAcc.accountNumber,
+          krwAmount: Number(amount),
+          currencyCode: fcyAcc.currency,
+        }),
+      });
+      if (!res.ok) {
+        alert("환전 요청에 실패했습니다.");
+        return;
+      }
+      // 성공 시 PIN 입력 단계로 진행
+      setShowPin(true);
+    } catch {
+      alert("환전 요청 중 오류가 발생했습니다.");
+    }
   };
 
   // 핀 입력 완료
